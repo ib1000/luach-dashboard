@@ -398,7 +398,10 @@ async function calculateDashboard() {
     : (!tachanunMincha ? "Yes (Omitted at Mincha)" : "Yes (Standard Weekday)");
 
   // Candle lighting, including Plag lookup for each relevant day.
-  const candleCandidates = items.filter(item => item.category === "candles" && String(item.date || "").slice(0,10) <= addDays(today,10));
+  const candleCandidates = items
+    .filter(item => item.category === "candles" && String(item.date || "").slice(0,10) >= today)
+    .sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")))
+    .slice(0,3);
   const candleLighting = [];
   for (const item of candleCandidates) {
     const m = String(item.date || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
@@ -504,7 +507,7 @@ function renderZmanim(data) {
 
 function renderCandles(entries) {
   const list=$("candle-list"); list.replaceChildren();
-  if (!entries?.length) { list.innerHTML='<div class="empty-state">No candle-lighting requirements in the next 10 days.</div>'; return; }
+  if (!entries?.length) { list.innerHTML='<div class="empty-state">No upcoming candle-lighting days found.</div>'; return; }
   for (const e of entries) {
     const a=document.createElement("article"); a.className="stack-item";
     const title=document.createElement("div"); title.className="stack-item-title"; title.textContent=`${e.day} · ${e.text_date}`;
