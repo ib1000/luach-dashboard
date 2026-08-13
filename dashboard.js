@@ -16,6 +16,7 @@ const CONFIG = {
 
 const HEB = "https://www.hebcal.com";
 let refreshTimer = null;
+let hebrewDateBoundaryTimer = null;
 let lastData = null;
 
 const $ = (id) => document.getElementById(id);
@@ -445,7 +446,7 @@ async function calculateDashboard() {
     status:"ok",
     updated:{date:today,time:`${String(p.hour).padStart(2,"0")}:${String(p.minute).padStart(2,"0")}`,timezone:CONFIG.timezone,epoch:Date.now()},
     location:{latitude:CONFIG.latitude,longitude:CONFIG.longitude,timezone:CONFIG.timezone},
-    calendar:{hebrew_date:hebrewDate,parshah:parshahDisplay,is_holiday:isHoliday,holidays:holidaysToday,tachanun:tachanunDisplay,daf_yomi:dafYomi,shabbat_mevarchim:isMevarchim,mevarchim_title:mevarchimTitle,mevarchim_note:mevarchimNote,molad:moladInfo},
+    calendar:{hebrew_date:hebrewDate,hebrew_date_current:hebrewDate,hebrew_date_next:tomorrowHebrewDate,parshah:parshahDisplay,is_holiday:isHoliday,holidays:holidaysToday,tachanun:tachanunDisplay,daf_yomi:dafYomi,shabbat_mevarchim:isMevarchim,mevarchim_title:mevarchimTitle,mevarchim_note:mevarchimNote,molad:moladInfo},
     tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason].filter(Boolean) : [],mincha:minchaElements,maariv:maarivElements},
     candle_lighting:candleLighting,
     zmanim:{ordered:zmanim,by_key:Object.fromEntries(zmanim.map(z=>[z.key,z.time]))},
@@ -524,9 +525,61 @@ function renderEvents(entries) {
   }
 }
 
+function hebrewDateParts(data) {
+  const current = data?.calendar?.hebrew_date_current || data?.calendar?.hebrew_date || "Hebrew Date Unavailable";
+  const next = data?.calendar?.hebrew_date_next || "";
+  const ordered = data?.zmanim?.ordered || [];
+  const sunsetIso = ordered.find(z => z.key === "sunset")?.iso;
+  const tzeitIso = ordered.find(z => z.key === "tzeit42min")?.iso;
+  const sunset = sunsetIso ? new Date(sunsetIso) : null;
+  const tzeit = tzeitIso ? new Date(tzeitIso) : null;
+  return {current, next, sunset, tzeit};
+}
+
+function setHebrewDateHeading(data, mode = "auto") {
+  const {current, next, sunset, tzeit} = hebrewDateParts(data);
+  if (!next || !sunset || !tzeit || Number.isNaN(sunset.getTime()) || Number.isNaN(tzeit.getTime())) {
+    $("hebrew-date").textContent = current;
+    return;
+  }
+
+  if (mode === "dual") {
+    $("hebrew-date").textContent = `${current} / ${next}`;
+    return;
+  }
+
+  const now = Date.now();
+  if (now >= tzeit.getTime()) {
+    $("hebrew-date").textContent = next;
+  } else if (now >= sunset.getTime()) {
+    $("hebrew-date").textContent = `${current} / ${next}`;
+  } else {
+    $("hebrew-date").textContent = current;
+  }
+}
+
+function scheduleHebrewDateBoundary(data) {
+  if (hebrewDateBoundaryTimer) clearTimeout(hebrewDateBoundaryTimer);
+  hebrewDateBoundaryTimer = null;
+
+  const {next, sunset, tzeit} = hebrewDateParts(data);
+  if (!next || !sunset || !tzeit || Number.isNaN(sunset.getTime()) || Number.isNaN(tzeit.getTime())) return;
+
+  const now = Date.now();
+  // Before Shkiah, schedule exactly one local display change. No API call is made.
+  if (now < sunset.getTime()) {
+    hebrewDateBoundaryTimer = setTimeout(() => {
+      if (lastData) setHebrewDateHeading(lastData, "dual");
+    }, Math.max(0, sunset.getTime() - now));
+  }
+  // At Tzeit we deliberately do not change the date locally. The scheduled API
+  // refresh handles the transition so date-dependent dashboard data changes together.
+}
+
 function renderDashboard(data) {
   lastData=data;
-  $("hebrew-date").textContent=data.calendar.hebrew_date;
+  setHebrewDateHeading(data);
+  scheduleHebrewDateBoundary(data);
   $("gregorian-date").textContent=humanDate(data.updated.date,{weekday:true});
   $("location-label").textContent=`${CONFIG.latitude.toFixed(4)}, ${CONFIG.longitude.toFixed(4)} · ${CONFIG.timezone}`;
   renderFacts(data.calendar); renderTefillah(data.tefillah); renderZmanim(data.zmanim); renderCandles(data.candle_lighting); renderEvents(data.upcoming_events);
@@ -538,12 +591,13 @@ function renderDashboard(data) {
 function nextRefreshDate(data) {
   const now=Date.now();
   const future=(data.zmanim?.ordered || [])
+    // Shkiah is handled locally by scheduleHebrewDateBoundary(); do not call Hebcal just for it.
+    .filter(z => z.key !== "sunset")
     .map(z => z.iso ? new Date(z.iso).getTime() : NaN)
     .filter(ms => Number.isFinite(ms) && ms > now)
     .sort((a,b)=>a-b);
 
-  // Compute next midnight in configured timezone by polling a bounded interval.
-  // We only need a reliable browser timer target, not an API timestamp.
+  // Compute next civil midnight in the configured timezone as a fallback.
   const today=ymd(datePartsInZone(new Date(now)));
   let midnight=now + 24*3600000;
   for (let t=now+60000; t<=now+26*3600000; t+=60000) {
@@ -580,7 +634,9 @@ async function refreshDashboard() {
 function updateClock() {
   const now=new Date();
   $("live-clock").textContent=new Intl.DateTimeFormat("en-CA", {timeZone:CONFIG.timezone,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).format(now);
-  if (lastData) renderZmanim(lastData.zmanim);
+  if (lastData) {
+    renderZmanim(lastData.zmanim);
+  }
 }
 
 window.addEventListener("load",()=>{
