@@ -145,7 +145,6 @@ async function calculateDashboard() {
 
   let hasYaalehShach = false, hasYaalehMincha = false, hasYaalehMaariv = false;
   let hasAlHanissimShach = false, hasAlHanissimMincha = false, hasAlHanissimMaariv = false;
-  let isRoshChodeshToday = false;
   const hallelShach = [], torahShach = [], otherShach = [], extraMincha = [], extraMaar = [];
 
   const items = calData.items || [];
@@ -235,7 +234,6 @@ async function calculateDashboard() {
       }
 
       if (/Rosh Chodesh/i.test(title)) {
-        isRoshChodeshToday = true;
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Rosh Chodesh";
         hasYaalehShach = true; hasYaalehMincha = true;
         hallelShach.push("Half Hallel");
@@ -344,7 +342,16 @@ async function calculateDashboard() {
   shachElements.push(...hallelShach, ...otherShach);
   if (!tachanunToday && wday !== 7) shachElements.push("No Tachanun");
   shachElements.push(...torahShach);
-  if (isRoshChodeshToday) shachElements.push("Barchi Nafshi");
+
+  // Psalm 27 (Le'David): from Rosh Chodesh Elul through Shemini Atzeret.
+  // Shacharit begins on 1 Elul; Maariv begins the preceding evening
+  // (the second night of Rosh Chodesh Elul). Keep it last in each list.
+  const isLeDavidDay = /Elul/i.test(hMonth) || (/Tishrei/i.test(hMonth) && hDay <= 22);
+  const isErevElul = /Av/i.test(hMonth) && hDay === 30;
+  if (isLeDavidDay) shachElements.push("Le'David");
+  if (hasYaalehShach && holidaysToday.some(title => /Rosh Chodesh/i.test(title))) {
+    shachElements.push("Barchi Nafshi");
+  }
 
   minchaElements.push(minchaSeason, rainDew);
   if (hasYaalehMincha) minchaElements.push("Yaaleh Veyavo");
@@ -356,6 +363,7 @@ async function calculateDashboard() {
   if (hasYaalehMaariv) maarivElements.push("Yaaleh Veyavo");
   if (hasAlHanissimMaariv) maarivElements.push("Al HaNissim");
   maarivElements.push(...extraMaar);
+  if (isLeDavidDay || isErevElul) maarivElements.push("Le'David");
 
   const tachanunDisplay = !tachanunToday
     ? `No (${tachanunReason})`
@@ -550,40 +558,4 @@ function updateClock() {
 
 window.addEventListener("load",()=>{
   updateClock(); setInterval(updateClock,1000); refreshDashboard();
-});
-
-
-// ---- PWA installation and service-worker registration ----
-let deferredInstallPrompt = null;
-
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-  deferredInstallPrompt = event;
-  const button = $("install-app");
-  if (button) button.classList.add("visible");
-});
-
-window.addEventListener("appinstalled", () => {
-  deferredInstallPrompt = null;
-  const button = $("install-app");
-  if (button) button.classList.remove("visible");
-});
-
-window.addEventListener("load", () => {
-  const button = $("install-app");
-  if (button) {
-    button.addEventListener("click", async () => {
-      if (!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice;
-      deferredInstallPrompt = null;
-      button.classList.remove("visible");
-    });
-  }
-
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
-      console.warn("Service worker registration failed:", error);
-    });
-  }
 });
