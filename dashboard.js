@@ -145,6 +145,7 @@ async function calculateDashboard() {
 
   let hasYaalehShach = false, hasYaalehMincha = false, hasYaalehMaariv = false;
   let hasAlHanissimShach = false, hasAlHanissimMincha = false, hasAlHanissimMaariv = false;
+  let isRoshChodeshToday = false;
   const hallelShach = [], torahShach = [], otherShach = [], extraMincha = [], extraMaar = [];
 
   const items = calData.items || [];
@@ -234,6 +235,7 @@ async function calculateDashboard() {
       }
 
       if (/Rosh Chodesh/i.test(title)) {
+        isRoshChodeshToday = true;
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Rosh Chodesh";
         hasYaalehShach = true; hasYaalehMincha = true;
         hallelShach.push("Half Hallel");
@@ -342,6 +344,7 @@ async function calculateDashboard() {
   shachElements.push(...hallelShach, ...otherShach);
   if (!tachanunToday && wday !== 7) shachElements.push("No Tachanun");
   shachElements.push(...torahShach);
+  if (isRoshChodeshToday) shachElements.push("Barchi Nafshi");
 
   minchaElements.push(minchaSeason, rainDew);
   if (hasYaalehMincha) minchaElements.push("Yaaleh Veyavo");
