@@ -37,3 +37,8 @@ The app shell is cached after first successful installation/load. Hebcal API res
 
 ## Important
 Service workers/PWA installation require a secure context. Use HTTPS (or localhost for development). Opening `index.html` directly from a USB drive with a `file://` URL will not provide the complete PWA installation/offline behavior.
+
+
+## Latest dashboard additions
+
+The Daily Zmanim panel now includes **Chatzot (Midnight)** after **Tzeit HaKochavim (42m)**, using Hebcal's `chatzotNight` value.

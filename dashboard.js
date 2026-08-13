@@ -421,12 +421,12 @@ async function calculateDashboard() {
     candleLighting.push(entry);
   }
 
-  const zmanKeys = ["alotHaShachar","misheyakir","sunrise","sofZmanShmaMGA","sofZmanShma","sofZmanTfilla","chatzot","minchaGedola","minchaKetana","plagHaMincha","sunset","tzeit42min"];
+  const zmanKeys = ["alotHaShachar","misheyakir","sunrise","sofZmanShmaMGA","sofZmanShma","sofZmanTfilla","chatzot","minchaGedola","minchaKetana","plagHaMincha","sunset","tzeit42min","chatzotNight"];
   const labels = {
     alotHaShachar:"Alot HaShachar (Dawn)", misheyakir:"Misheyakir (Tallit)", sunrise:"Netz Hachamah (Sunrise)",
     sofZmanShmaMGA:"Sof Zman Shma (MGA)", sofZmanShma:"Sof Zman Shma (Gra)", sofZmanTfilla:"Sof Zman Tefillah (Gra)",
     chatzot:"Chatzot (Midday)", minchaGedola:"Mincha Gedolah", minchaKetana:"Mincha Ketanah",
-    plagHaMincha:"Plag HaMincha", sunset:"Shkiat HaChamah (Sunset)", tzeit42min:"Tzeit HaKochavim (42m)",
+    plagHaMincha:"Plag HaMincha", sunset:"Shkiat HaChamah (Sunset)", tzeit42min:"Tzeit HaKochavim (42m)", chatzotNight:"Chatzot (Midnight)",
   };
   const zmanim = zmanKeys.map(key => ({ key, label:labels[key], time:hhmmFromIso(zmanimData.times?.[key]), iso:zmanimData.times?.[key] || "" }));
 
