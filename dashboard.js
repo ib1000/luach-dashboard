@@ -78,6 +78,23 @@ function dayName(iso) {
     .format(new Date(Date.UTC(y,m-1,d,12)));
 }
 
+
+function parseHebrewDate(value) {
+  const text = String(value || "");
+  const m = text.match(/(\d+)\s+(Nisan|Iyyar|Sivan|Tamuz|Tammuz|Av|Elul|Tishrei|Cheshvan|Kislev|Tevet|Shvat|Shevat|Adar(?:\s+I{1,2})?)/i);
+  return m ? { day: Number(m[1]), month: m[2] } : { day: 0, month: "" };
+}
+
+function hebrewDateForGregorianDay(items, day) {
+  for (const item of items || []) {
+    if (String(item.date || "").slice(0, 10) !== day) continue;
+    if (item.hdate) return String(item.hdate);
+    if (/^hebdate$/i.test(String(item.category || "")) && item.title_orig) return String(item.title_orig);
+    if (/^hebdate$/i.test(String(item.category || "")) && item.title) return String(item.title);
+  }
+  return "";
+}
+
 function hhmmFromIso(value) {
   const m = String(value || "").match(/T(\d{2}:\d{2})/);
   return m ? m[1] : "--:--";
@@ -315,9 +332,16 @@ async function calculateDashboard() {
   }
 
   // Rain/dew blessing logic, ported from Perl.
-  let hDay = 1, hMonth = "";
-  const hm = hebrewDate.match(/^(\d+)\s+([A-Za-z]+)/);
-  if (hm) { hDay = Number(hm[1]); hMonth = hm[2]; }
+  const currentHebrew = parseHebrewDate(hebrewDate);
+  let hDay = currentHebrew.day || 1;
+  let hMonth = currentHebrew.month || "";
+
+  // Ma'ariv belongs to the Hebrew date that begins this evening. Use the
+  // next Gregorian day's Hebcal hdate rather than inferring it from today's
+  // displayed Hebrew date. This is especially important on 30 Av, when
+  // Ma'ariv is already 1 Elul (the second night of Rosh Chodesh Elul).
+  const tomorrowHebrewDate = hebrewDateForGregorianDay(items, tomorrow);
+  const tomorrowHebrew = parseHebrewDate(tomorrowHebrewDate);
 
   let isIsraelRain = false, isDiaspRain = false;
   if (/Kislev|Tevet|Shevat|Adar/i.test(hMonth)) isIsraelRain = true;
@@ -344,14 +368,17 @@ async function calculateDashboard() {
   shachElements.push(...torahShach);
 
   // Psalm 27 (Le'David): from Rosh Chodesh Elul through Shemini Atzeret.
-  // Shacharit begins on 1 Elul; Maariv begins the preceding evening
-  // (the second night of Rosh Chodesh Elul). Keep it last in each list.
+  // Shacharit follows today's Hebrew date. Ma'ariv follows the Hebrew date
+  // that begins this evening, so use tomorrowHebrew rather than today's date.
+  // Keep Le'David last in each applicable list.
   const isLeDavidDay = /Elul/i.test(hMonth) || (/Tishrei/i.test(hMonth) && hDay <= 22);
-  const isErevElul = /Av/i.test(hMonth) && hDay === 30;
-  if (isLeDavidDay) shachElements.push("Le'David");
+  const isLeDavidMaariv =
+    /Elul/i.test(tomorrowHebrew.month) ||
+    (/Tishrei/i.test(tomorrowHebrew.month) && tomorrowHebrew.day <= 22);
   if (hasYaalehShach && holidaysToday.some(title => /Rosh Chodesh/i.test(title))) {
     shachElements.push("Barchi Nafshi");
   }
+  if (isLeDavidDay) shachElements.push("Le'David");
 
   minchaElements.push(minchaSeason, rainDew);
   if (hasYaalehMincha) minchaElements.push("Yaaleh Veyavo");
@@ -363,7 +390,7 @@ async function calculateDashboard() {
   if (hasYaalehMaariv) maarivElements.push("Yaaleh Veyavo");
   if (hasAlHanissimMaariv) maarivElements.push("Al HaNissim");
   maarivElements.push(...extraMaar);
-  if (isLeDavidDay || isErevElul) maarivElements.push("Le'David");
+  if (isLeDavidMaariv) maarivElements.push("Le'David");
 
   const tachanunDisplay = !tachanunToday
     ? `No (${tachanunReason})`
