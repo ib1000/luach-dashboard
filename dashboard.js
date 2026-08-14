@@ -111,6 +111,7 @@ function buildUrls(today, lookahead) {
   const loc = `latitude=${encodeURIComponent(CONFIG.latitude)}&longitude=${encodeURIComponent(CONFIG.longitude)}&tzid=${encodeURIComponent(CONFIG.timezone)}`;
   return {
     zmanim: `${HEB}/zmanim?cfg=json&${loc}&date=${today}`,
+    zmanimTomorrow: `${HEB}/zmanim?cfg=json&${loc}&date=${addDays(today, 1)}`,
     calendar: `${HEB}/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&ss=on&mf=on&c=on&F=on&d=on&b=on&molad=on&mvch=on&${loc}&start=${today}&end=${lookahead}`,
     shabbatDiaspora: `${HEB}/shabbat?cfg=json&${loc}&i=off`,
     shabbatIsrael: `${HEB}/shabbat?cfg=json&i=on`,
@@ -126,8 +127,8 @@ async function calculateDashboard() {
   const wday = perlWday(today);
 
   const urls = buildUrls(today, lookahead);
-  const [zmanimData, calData, shabDiasp, shabIsrael] = await Promise.all([
-    fetchJson(urls.zmanim), fetchJson(urls.calendar),
+  const [zmanimData, zmanimTomorrowData, calData, shabDiasp, shabIsrael] = await Promise.all([
+    fetchJson(urls.zmanim), fetchJson(urls.zmanimTomorrow), fetchJson(urls.calendar),
     fetchJson(urls.shabbatDiaspora), fetchJson(urls.shabbatIsrael),
   ]);
 
@@ -398,10 +399,7 @@ async function calculateDashboard() {
     : (!tachanunMincha ? "Yes (Omitted at Mincha)" : "Yes (Standard Weekday)");
 
   // Candle lighting, including Plag lookup for each relevant day.
-  const candleCandidates = items
-    .filter(item => item.category === "candles" && String(item.date || "").slice(0,10) >= today)
-    .sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")))
-    .slice(0,3);
+  const candleCandidates = items.filter(item => item.category === "candles" && String(item.date || "").slice(0,10) <= addDays(today,10));
   const candleLighting = [];
   for (const item of candleCandidates) {
     const m = String(item.date || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
@@ -432,7 +430,22 @@ async function calculateDashboard() {
     chatzot:"Chatzot (Midday)", minchaGedola:"Mincha Gedolah", minchaKetana:"Mincha Ketanah",
     plagHaMincha:"Plag HaMincha", sunset:"Shkiat HaChamah (Sunset)", tzeit42min:"Tzeit HaKochavim (42m)", chatzotNight:"Chatzot (Midnight)",
   };
-  const zmanim = zmanKeys.map(key => ({ key, label:labels[key], time:hhmmFromIso(zmanimData.times?.[key]), iso:zmanimData.times?.[key] || "" }));
+  // Hebcal's chatzotNight for a civil date is the midnight near the START of
+  // that date. For the dashboard's final row we need the next upcoming
+  // nighttime Chatzot: today's value if it is still ahead, otherwise
+  // tomorrow's value. This also lets the normal next-zman highlighting
+  // continue correctly across civil midnight.
+  const todayChatzotNight = zmanimData.times?.chatzotNight || "";
+  const tomorrowChatzotNight = zmanimTomorrowData.times?.chatzotNight || "";
+  const todayChatzotMs = todayChatzotNight ? new Date(todayChatzotNight).getTime() : NaN;
+  const upcomingChatzotNight = Number.isFinite(todayChatzotMs) && todayChatzotMs > Date.now()
+    ? todayChatzotNight
+    : tomorrowChatzotNight;
+
+  const zmanim = zmanKeys.map(key => {
+    const iso = key === "chatzotNight" ? upcomingChatzotNight : (zmanimData.times?.[key] || "");
+    return { key, label:labels[key], time:hhmmFromIso(iso), iso };
+  });
 
   const upcomingEvents = items
     .filter(item => (item.category === "holiday" || item.category === "roshchodesh") && String(item.date || "").slice(0,10) > today && !/Mevarchim|Molad/i.test(item.title || ""))
@@ -507,7 +520,7 @@ function renderZmanim(data) {
 
 function renderCandles(entries) {
   const list=$("candle-list"); list.replaceChildren();
-  if (!entries?.length) { list.innerHTML='<div class="empty-state">No upcoming candle-lighting days found.</div>'; return; }
+  if (!entries?.length) { list.innerHTML='<div class="empty-state">No candle-lighting requirements in the next 10 days.</div>'; return; }
   for (const e of entries) {
     const a=document.createElement("article"); a.className="stack-item";
     const title=document.createElement("div"); title.className="stack-item-title"; title.textContent=`${e.day} · ${e.text_date}`;
@@ -606,7 +619,10 @@ function nextRefreshDate(data) {
   for (let t=now+60000; t<=now+26*3600000; t+=60000) {
     if (ymd(datePartsInZone(new Date(t))) !== today) { midnight=t; break; }
   }
-  return new Date(Math.min(future[0] ?? Infinity, midnight));
+  // Prefer the next actual zman. Civil midnight is only a fallback if no
+  // usable future zman was returned. This avoids an unnecessary API call at
+  // 00:00 while still allowing the next Chatzot and then Alot to drive refreshes.
+  return new Date(future[0] ?? midnight);
 }
 
 function scheduleNextRefresh(data) {

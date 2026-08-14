@@ -42,7 +42,3 @@ Service workers/PWA installation require a secure context. Use HTTPS (or localho
 ## Latest dashboard additions
 
 The Daily Zmanim panel now includes **Chatzot (Midnight)** after **Tzeit HaKochavim (42m)**, using Hebcal's `chatzotNight` value.
-
-
-## Candle-lighting panel
-The Candle Lighting panel shows the next three dates on which candle lighting is required, rather than using a fixed 10-day window.
