@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_CACHE = "luach-dashboard-shell-v7";
+const APP_CACHE = "luach-dashboard-shell-v8";
 const DATA_CACHE = "luach-dashboard-data-v5";
 
 const APP_SHELL = [

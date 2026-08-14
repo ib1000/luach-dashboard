@@ -97,8 +97,15 @@ function hebrewDateForGregorianDay(items, day) {
 }
 
 function hhmmFromIso(value) {
-  const m = String(value || "").match(/T(\d{2}:\d{2})/);
-  return m ? m[1] : "--:--";
+  if (!value) return "--:--";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "--:--";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CONFIG.timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(dt);
 }
 
 async function fetchJson(url) {
