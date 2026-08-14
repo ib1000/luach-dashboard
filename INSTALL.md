@@ -42,3 +42,6 @@ Service workers/PWA installation require a secure context. Use HTTPS (or localho
 ## Latest dashboard additions
 
 The Daily Zmanim panel now includes **Chatzot (Midnight)** after **Tzeit HaKochavim (42m)**, using Hebcal's `chatzotNight` value.
+
+## Kabbalat Shabbat panel
+On Fridays, the Tefillah Modifications panel includes a Kabbalat Shabbat section after Mincha. It shows Full Kabbalat Shabbat on an ordinary Friday and Shortened Kabbalat Shabbat when the incoming Shabbat coincides with Yom Tov or Chol HaMoed, or when Shabbat begins immediately after the concluding festival day.

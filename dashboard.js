@@ -96,6 +96,14 @@ function hebrewDateForGregorianDay(items, day) {
   return "";
 }
 
+function usesShortenedKabbalatShabbat(title) {
+  // Common Nusach Ashkenaz practice: shorten Kabbalat Shabbat when
+  // Shabbat coincides with Yom Tov or Chol HaMoed, or when Shabbat
+  // begins immediately after the final day of a festival. Keep this
+  // rule centralized so it can be adjusted for a local minhag.
+  return /Chol HaMoed|Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah|Rosh Hashana|Yom Kippur/i.test(String(title || ""));
+}
+
 function hhmmFromIso(value) {
   if (!value) return "--:--";
   const dt = new Date(value);
@@ -174,6 +182,21 @@ async function calculateDashboard() {
   const hallelShach = [], torahShach = [], otherShach = [], extraMincha = [], extraMaar = [];
 
   const items = calData.items || [];
+
+  // Friday-only Kabbalat Shabbat status. The shortened form is used
+  // when the incoming Shabbat coincides with Yom Tov / Chol HaMoed,
+  // or when Friday itself is the concluding festival day immediately
+  // before Shabbat.
+  let kabbalatShabbat = [];
+  if (wday === 6) {
+    const relevantFestival = items.some(item => {
+      const itemDay = String(item.date || "").slice(0, 10);
+      if (itemDay !== today && itemDay !== tomorrow) return false;
+      return usesShortenedKabbalatShabbat(item.title);
+    });
+    kabbalatShabbat = [relevantFestival ? "Shortened Kabbalat Shabbat" : "Full Kabbalat Shabbat"];
+  }
+
   for (const item of items) {
     const itemDate = String(item.date || "");
     const itemDay = itemDate.slice(0,10);
@@ -481,7 +504,7 @@ async function calculateDashboard() {
     updated:{date:today,time:`${String(p.hour).padStart(2,"0")}:${String(p.minute).padStart(2,"0")}`,timezone:CONFIG.timezone,epoch:Date.now()},
     location:{latitude:CONFIG.latitude,longitude:CONFIG.longitude,timezone:CONFIG.timezone},
     calendar:{hebrew_date:hebrewDate,hebrew_date_current:hebrewDate,hebrew_date_next:tomorrowHebrewDate,parshah:parshahDisplay,is_holiday:isHoliday,holidays:holidaysToday,tachanun:tachanunDisplay,daf_yomi:dafYomi,shabbat_mevarchim:isMevarchim,mevarchim_title:mevarchimTitle,mevarchim_note:mevarchimNote,molad:moladInfo},
-    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason].filter(Boolean) : [],mincha:minchaElements,maariv:maarivElements},
+    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason].filter(Boolean) : [],mincha:minchaElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
     candle_lighting:candleLighting,
     zmanim:{ordered:zmanim,by_key:Object.fromEntries(zmanim.map(z=>[z.key,z.time]))},
     upcoming_events:upcomingEvents,
@@ -509,7 +532,7 @@ function renderFacts(calendar) {
 function renderTefillah(t) {
   $("nusach-label").textContent = t.nusach ? `Nusach ${t.nusach}` : "";
   const grid = $("tefillah-grid"); grid.replaceChildren();
-  for (const [name,items] of [["Shacharit",t.shacharit],["Musaf",t.musaf],["Mincha",t.mincha],["Ma'ariv",t.maariv]]) {
+  for (const [name,items] of [["Shacharit",t.shacharit],["Musaf",t.musaf],["Mincha",t.mincha],["Kabbalat Shabbat",t.kabbalat_shabbat],["Ma'ariv",t.maariv]]) {
     if (!items?.length) continue;
     const card = document.createElement("article"); card.className="tefillah-card";
     const h3 = document.createElement("h3"); h3.textContent=name;
