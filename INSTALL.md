@@ -45,3 +45,8 @@ The Daily Zmanim panel now includes **Chatzot (Midnight)** after **Tzeit HaKocha
 
 ## Kabbalat Shabbat panel
 On Fridays, the Tefillah Modifications panel includes a Kabbalat Shabbat section after Mincha. It shows Full Kabbalat Shabbat on an ordinary Friday and Shortened Kabbalat Shabbat when the incoming Shabbat coincides with Yom Tov or Chol HaMoed, or when Shabbat begins immediately after the concluding festival day.
+
+
+## Changing location
+
+The dashboard now includes a **Change location** button in the footer. Search by city name or postal code and select a result. The selected city, coordinates, country code, and IANA timezone are stored in the browser's `localStorage`, so each Chromebox/computer can remember a different location without changing the GitHub-hosted files. The dashboard uses Open-Meteo's geocoding search to find cities and then sends the selected latitude, longitude, and timezone to Hebcal for calendar/zmanim calculations.

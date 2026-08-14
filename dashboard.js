@@ -6,10 +6,37 @@
  * No Linux, Perl, Python, or local web server is required at runtime.
  */
 
-const CONFIG = {
+const DEFAULT_LOCATION = {
+  name: "Toronto, Ontario, Canada",
   latitude: 43.6532,
   longitude: -79.3832,
   timezone: "America/Toronto",
+  countryCode: "CA",
+};
+
+const LOCATION_STORAGE_KEY = "luach-dashboard-location-v1";
+
+function loadSavedLocation() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LOCATION_STORAGE_KEY) || "null");
+    if (saved && Number.isFinite(Number(saved.latitude)) && Number.isFinite(Number(saved.longitude)) && saved.timezone) {
+      return {
+        name: String(saved.name || "Selected location"),
+        latitude: Number(saved.latitude),
+        longitude: Number(saved.longitude),
+        timezone: String(saved.timezone),
+        countryCode: String(saved.countryCode || "").toUpperCase(),
+      };
+    }
+  } catch (error) {
+    console.warn("Unable to read saved location", error);
+  }
+  return { ...DEFAULT_LOCATION };
+}
+
+const SAVED_LOCATION = loadSavedLocation();
+const CONFIG = {
+  ...SAVED_LOCATION,
   refreshCushionMs: 3000,
   retryAfterErrorMs: 60000,
 };
@@ -126,10 +153,11 @@ async function fetchJson(url) {
 
 function buildUrls(today, lookahead) {
   const loc = `latitude=${encodeURIComponent(CONFIG.latitude)}&longitude=${encodeURIComponent(CONFIG.longitude)}&tzid=${encodeURIComponent(CONFIG.timezone)}`;
+  const israel = CONFIG.countryCode === "IL" ? "on" : "off";
   return {
     zmanim: `${HEB}/zmanim?cfg=json&${loc}&date=${today}`,
     zmanimTomorrow: `${HEB}/zmanim?cfg=json&${loc}&date=${addDays(today, 1)}`,
-    calendar: `${HEB}/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&ss=on&mf=on&c=on&F=on&d=on&b=on&molad=on&mvch=on&${loc}&start=${today}&end=${lookahead}`,
+    calendar: `${HEB}/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&ss=on&mf=on&c=on&F=on&d=on&b=on&molad=on&mvch=on&i=${israel}&${loc}&start=${today}&end=${lookahead}`,
     shabbatDiaspora: `${HEB}/shabbat?cfg=json&${loc}&i=off`,
     shabbatIsrael: `${HEB}/shabbat?cfg=json&i=on`,
   };
@@ -504,7 +532,7 @@ async function calculateDashboard() {
   return {
     status:"ok",
     updated:{date:today,time:`${String(p.hour).padStart(2,"0")}:${String(p.minute).padStart(2,"0")}`,timezone:CONFIG.timezone,epoch:Date.now()},
-    location:{latitude:CONFIG.latitude,longitude:CONFIG.longitude,timezone:CONFIG.timezone},
+    location:{name:CONFIG.name,latitude:CONFIG.latitude,longitude:CONFIG.longitude,timezone:CONFIG.timezone,countryCode:CONFIG.countryCode},
     calendar:{hebrew_date:hebrewDate,hebrew_date_current:hebrewDate,hebrew_date_next:tomorrowHebrewDate,parshah:parshahDisplay,is_holiday:isHoliday,holidays:holidaysToday,tachanun:tachanunDisplay,daf_yomi:dafYomi,shabbat_mevarchim:isMevarchim,mevarchim_title:mevarchimTitle,mevarchim_note:mevarchimNote,molad:moladInfo},
     tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason].filter(Boolean) : [],mincha:minchaElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
     candle_lighting:candleLighting,
@@ -652,7 +680,7 @@ function renderDashboard(data) {
   setHebrewDateHeading(data);
   scheduleHebrewDateBoundary(data);
   $("gregorian-date").textContent=humanDate(data.updated.date,{weekday:true});
-  $("location-label").textContent=`${CONFIG.latitude.toFixed(4)}, ${CONFIG.longitude.toFixed(4)} · ${CONFIG.timezone}`;
+  $("location-label").textContent=`${CONFIG.name} · ${CONFIG.timezone}`;
   renderFacts(data.calendar); renderTefillah(data.tefillah); renderZmanim(data.zmanim); renderCandles(data.candle_lighting); renderEvents(data.upcoming_events);
   $("error-banner").hidden=true;
   $("status-dot").className="status-dot ok";
@@ -689,6 +717,125 @@ function scheduleNextRefresh(data) {
   $("next-refresh").textContent=`Next API refresh: ${when}`;
 }
 
+
+let locationSearchTimer = null;
+let locationSearchController = null;
+
+function formatLocationName(result) {
+  const parts = [result.name, result.admin1, result.country].filter(Boolean);
+  return [...new Set(parts)].join(", ");
+}
+
+function setLocationSearchMessage(message, isError = false) {
+  const box = $("location-results");
+  box.replaceChildren();
+  const div = document.createElement("div");
+  div.className = isError ? "location-search-message error" : "location-search-message";
+  div.textContent = message;
+  box.append(div);
+}
+
+async function searchLocations(query) {
+  const q = String(query || "").trim();
+  if (q.length < 2) {
+    setLocationSearchMessage("Type at least 2 characters to search for a city or postal code.");
+    return;
+  }
+
+  if (locationSearchController) locationSearchController.abort();
+  locationSearchController = new AbortController();
+  setLocationSearchMessage("Searching…");
+
+  try {
+    const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+    url.searchParams.set("name", q);
+    url.searchParams.set("count", "12");
+    url.searchParams.set("language", "en");
+    url.searchParams.set("format", "json");
+
+    const response = await fetch(url, { signal: locationSearchController.signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`Location search failed (${response.status})`);
+    const payload = await response.json();
+    const results = (payload.results || []).filter(r =>
+      Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude)) && r.timezone
+    );
+
+    const box = $("location-results");
+    box.replaceChildren();
+    if (!results.length) {
+      setLocationSearchMessage("No matching locations found.");
+      return;
+    }
+
+    for (const result of results) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "location-result";
+
+      const primary = document.createElement("span");
+      primary.className = "location-result-name";
+      primary.textContent = formatLocationName(result);
+
+      const secondary = document.createElement("span");
+      secondary.className = "location-result-meta";
+      secondary.textContent = result.timezone;
+
+      button.append(primary, secondary);
+      button.addEventListener("click", () => selectLocation(result));
+      box.append(button);
+    }
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    console.error(error);
+    setLocationSearchMessage("Unable to search locations. Check the Internet connection and try again.", true);
+  }
+}
+
+function selectLocation(result) {
+  const selected = {
+    name: formatLocationName(result),
+    latitude: Number(result.latitude),
+    longitude: Number(result.longitude),
+    timezone: String(result.timezone),
+    countryCode: String(result.country_code || "").toUpperCase(),
+  };
+
+  Object.assign(CONFIG, selected);
+  localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(selected));
+
+  $("location-label").textContent = `${CONFIG.name} · ${CONFIG.timezone}`;
+  $("location-dialog").close();
+  $("location-search").value = "";
+  $("location-results").replaceChildren();
+
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (hebrewDateBoundaryTimer) clearTimeout(hebrewDateBoundaryTimer);
+  lastData = null;
+  updateClock();
+  refreshDashboard();
+}
+
+function openLocationDialog() {
+  $("current-location").textContent = `${CONFIG.name} · ${CONFIG.timezone}`;
+  const dialog = $("location-dialog");
+  if (!dialog.open) dialog.showModal();
+  setLocationSearchMessage("Search by city name or postal code.");
+  setTimeout(() => $("location-search").focus(), 0);
+}
+
+function setupLocationControls() {
+  $("change-location").addEventListener("click", openLocationDialog);
+  $("location-cancel").addEventListener("click", () => $("location-dialog").close());
+  $("location-search").addEventListener("input", (event) => {
+    clearTimeout(locationSearchTimer);
+    const q = event.target.value;
+    locationSearchTimer = setTimeout(() => searchLocations(q), 300);
+  });
+  $("location-search").addEventListener("keydown", (event) => {
+    if (event.key === "Escape") $("location-dialog").close();
+  });
+}
+
 async function refreshDashboard() {
   if (refreshTimer) clearTimeout(refreshTimer);
   $("status-dot").className="status-dot";
@@ -714,5 +861,7 @@ function updateClock() {
 }
 
 window.addEventListener("load",()=>{
+  setupLocationControls();
+  $("location-label").textContent=`${CONFIG.name} · ${CONFIG.timezone}`;
   updateClock(); setInterval(updateClock,1000); refreshDashboard();
 });
