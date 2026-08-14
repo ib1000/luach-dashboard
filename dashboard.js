@@ -430,17 +430,25 @@ async function calculateDashboard() {
     chatzot:"Chatzot (Midday)", minchaGedola:"Mincha Gedolah", minchaKetana:"Mincha Ketanah",
     plagHaMincha:"Plag HaMincha", sunset:"Shkiat HaChamah (Sunset)", tzeit42min:"Tzeit HaKochavim (42m)", chatzotNight:"Chatzot (Midnight)",
   };
-  // Hebcal's chatzotNight for a civil date is the midnight near the START of
-  // that date. For the dashboard's final row we need the next upcoming
-  // nighttime Chatzot: today's value if it is still ahead, otherwise
-  // tomorrow's value. This also lets the normal next-zman highlighting
-  // continue correctly across civil midnight.
-  const todayChatzotNight = zmanimData.times?.chatzotNight || "";
-  const tomorrowChatzotNight = zmanimTomorrowData.times?.chatzotNight || "";
-  const todayChatzotMs = todayChatzotNight ? new Date(todayChatzotNight).getTime() : NaN;
-  const upcomingChatzotNight = Number.isFinite(todayChatzotMs) && todayChatzotMs > Date.now()
-    ? todayChatzotNight
-    : tomorrowChatzotNight;
+  // Calculate the upcoming nighttime Chatzot as the midpoint between
+  // today's sunset and tomorrow's sunrise. This avoids ambiguity in the
+  // civil-date association of Hebcal's chatzotNight field and guarantees
+  // that the displayed midnight belongs to the night that follows today's
+  // sunset.
+  const sunsetIsoForMidnight = zmanimData.times?.sunset || "";
+  const tomorrowSunriseIso = zmanimTomorrowData.times?.sunrise || "";
+  let upcomingChatzotNight = "";
+  if (sunsetIsoForMidnight && tomorrowSunriseIso) {
+    const sunsetMs = new Date(sunsetIsoForMidnight).getTime();
+    const sunriseMs = new Date(tomorrowSunriseIso).getTime();
+    if (Number.isFinite(sunsetMs) && Number.isFinite(sunriseMs) && sunriseMs > sunsetMs) {
+      upcomingChatzotNight = new Date(sunsetMs + ((sunriseMs - sunsetMs) / 2)).toISOString();
+    }
+  }
+  // Fallback only if the midpoint cannot be calculated.
+  if (!upcomingChatzotNight) {
+    upcomingChatzotNight = zmanimTomorrowData.times?.chatzotNight || zmanimData.times?.chatzotNight || "";
+  }
 
   const zmanim = zmanKeys.map(key => {
     const iso = key === "chatzotNight" ? upcomingChatzotNight : (zmanimData.times?.[key] || "");
@@ -509,7 +517,19 @@ function renderZmanim(data) {
   const list=$("zmanim-list"); list.replaceChildren();
   const z=data?.ordered || [];
   const now=Date.now();
-  const next=z.findIndex(x => x.iso && new Date(x.iso).getTime() > now);
+  // Select the chronologically earliest future zman, independent of where
+  // that zman appears in the visual list. This is essential for the final
+  // Chatzot (Midnight) row and for Alot HaShachar after midnight.
+  let next = -1;
+  let nextMs = Infinity;
+  z.forEach((item, i) => {
+    if (!item.iso) return;
+    const ms = new Date(item.iso).getTime();
+    if (Number.isFinite(ms) && ms > now && ms < nextMs) {
+      nextMs = ms;
+      next = i;
+    }
+  });
   z.forEach((item,i)=>{
     const row=document.createElement("div"); row.className=`zman-row${i===next?" next":""}`;
     const l=document.createElement("span"); l.className="zman-label"; l.textContent=item.label;
