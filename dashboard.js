@@ -96,12 +96,14 @@ function hebrewDateForGregorianDay(items, day) {
   return "";
 }
 
-function usesShortenedKabbalatShabbat(title) {
-  // Common Nusach Ashkenaz practice: shorten Kabbalat Shabbat when
-  // Shabbat coincides with Yom Tov or Chol HaMoed, or when Shabbat
-  // begins immediately after the final day of a festival. Keep this
-  // rule centralized so it can be adjusted for a local minhag.
-  return /Chol HaMoed|Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah|Rosh Hashana|Yom Kippur/i.test(String(title || ""));
+function usesShortenedKabbalatShabbat(title, category = "") {
+  // Only true Yom Tov / Chol HaMoed events should shorten Kabbalat Shabbat.
+  // Avoid substring false-positives such as "Rosh Hashana LaBehemot".
+  const t = String(title || "").trim();
+  const c = String(category || "").toLowerCase();
+  if (c !== "holiday") return false;
+  if (/Rosh Hashana LaBehemot/i.test(t)) return false;
+  return /Chol HaMoed|^Pesach(?:\s|$)|^Shavuot(?:\s|$)|^Sukkot(?:\s|$)|^Shemini Atzeret(?:\s|$)|^Simchat Torah(?:\s|$)|^Rosh Hashana(?:\s|$)|^Yom Kippur(?:\s|$)/i.test(t);
 }
 
 function hhmmFromIso(value) {
@@ -192,7 +194,7 @@ async function calculateDashboard() {
     const relevantFestival = items.some(item => {
       const itemDay = String(item.date || "").slice(0, 10);
       if (itemDay !== today && itemDay !== tomorrow) return false;
-      return usesShortenedKabbalatShabbat(item.title);
+      return usesShortenedKabbalatShabbat(item.title, item.category);
     });
     kabbalatShabbat = [relevantFestival ? "Shortened Kabbalat Shabbat" : "Full Kabbalat Shabbat"];
   }
