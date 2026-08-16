@@ -198,20 +198,34 @@ async function calculateDashboard() {
   let isBeforeShavuot = false;
   let isBeforeTishaBav = false;
 
+  // Show only the parshah that applies to the selected location.
+  // Israel follows the Israel cycle; every other location follows Diaspora.
   let parshahDisplay = "No Parshah This Week";
   const diasporaParsha = (shabDiasp.items || []).find(i => i.category === "parashat")?.title || "";
   const israelParsha = (shabIsrael.items || []).find(i => i.category === "parashat")?.title || "";
-  if (diasporaParsha) {
-    parshahDisplay = israelParsha && israelParsha !== diasporaParsha
-      ? `${diasporaParsha} (Israel: ${israelParsha})`
-      : diasporaParsha;
-  }
+  const locationParsha = CONFIG.countryCode === "IL" ? israelParsha : diasporaParsha;
+  if (locationParsha) parshahDisplay = locationParsha;
 
   let hasYaalehShach = false, hasYaalehMincha = false, hasYaalehMaariv = false;
   let hasAlHanissimShach = false, hasAlHanissimMincha = false, hasAlHanissimMaariv = false;
   const hallelShach = [], torahShach = [], otherShach = [], extraMincha = [], extraMaar = [];
 
   const items = calData.items || [];
+
+  // A service uses the weekday Amidah rain/dew blessing only on a weekday.
+  // Keep Chol HaMoed as weekday for this purpose; suppress the blessing only
+  // on Shabbat or an actual Yom Tov.
+  const isActualYomTov = (item, day) => {
+    if (String(item?.date || "").slice(0, 10) !== day) return false;
+    if (String(item?.category || "") !== "holiday") return false;
+    const title = String(item?.title || "");
+    if (/Chol HaMoed|Erev|Rosh Hashana LaBehemot/i.test(title)) return false;
+    return /^(?:Rosh Hashana|Yom Kippur|Pesach (?:I|II|VII|VIII)|Shavuot (?:I|II)|Sukkot (?:I|II)|Shemini Atzeret|Simchat Torah)(?:$|:)/i.test(title);
+  };
+  const yomTovToday = items.some(item => isActualYomTov(item, today));
+  const yomTovTomorrow = items.some(item => isActualYomTov(item, tomorrow));
+  const shabbatToday = wday === 7;
+  const shabbatTonight = wday === 6; // Friday-night Ma'ariv belongs to Shabbat.
 
   // Friday-only Kabbalat Shabbat status. The shortened form is used
   // when the incoming Shabbat coincides with Yom Tov / Chol HaMoed,
@@ -393,6 +407,15 @@ async function calculateDashboard() {
     shachSeason = musafSeason = minchaSeason = maarivSeason = seasonalPhrase;
   }
 
+  // In this dashboard's minhag, Morid HaTal is displayed only in Israel.
+  // Mashiv HaRuach remains location-independent.
+  if (CONFIG.countryCode !== "IL") {
+    if (/Morid HaTal/i.test(shachSeason)) shachSeason = "";
+    if (/Morid HaTal/i.test(musafSeason)) musafSeason = "";
+    if (/Morid HaTal/i.test(minchaSeason)) minchaSeason = "";
+    if (/Morid HaTal/i.test(maarivSeason)) maarivSeason = "";
+  }
+
   // Rain/dew blessing logic, ported from Perl.
   const currentHebrew = parseHebrewDate(hebrewDate);
   let hDay = currentHebrew.day || 1;
@@ -422,7 +445,8 @@ async function calculateDashboard() {
     ? diaspBlessing
     : `Diaspora: ${diaspBlessing} | Israel: ${israelBlessing}`;
 
-  shachElements.push(shachSeason, rainDew);
+  if (shachSeason) shachElements.push(shachSeason);
+  if (!shabbatToday && !yomTovToday) shachElements.push(rainDew);
   if (hasYaalehShach) shachElements.push("Yaaleh Veyavo");
   if (hasAlHanissimShach) shachElements.push("Al HaNissim");
   shachElements.push(...hallelShach, ...otherShach);
@@ -442,13 +466,15 @@ async function calculateDashboard() {
   }
   if (isLeDavidDay) shachElements.push("Le'David");
 
-  minchaElements.push(minchaSeason, rainDew);
+  if (minchaSeason) minchaElements.push(minchaSeason);
+  if (!shabbatToday && !yomTovToday) minchaElements.push(rainDew);
   if (hasYaalehMincha) minchaElements.push("Yaaleh Veyavo");
   if (hasAlHanissimMincha) minchaElements.push("Al HaNissim");
   minchaElements.push(...extraMincha);
   if ((!tachanunMincha || !tachanunToday) && wday !== 7) minchaElements.push("No Tachanun");
 
-  maarivElements.push(maarivSeason, rainDew);
+  if (maarivSeason) maarivElements.push(maarivSeason);
+  if (!shabbatTonight && !yomTovTomorrow) maarivElements.push(rainDew);
   if (hasYaalehMaariv) maarivElements.push("Yaaleh Veyavo");
   if (hasAlHanissimMaariv) maarivElements.push("Al HaNissim");
   maarivElements.push(...extraMaar);

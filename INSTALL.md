@@ -50,3 +50,8 @@ On Fridays, the Tefillah Modifications panel includes a Kabbalat Shabbat section
 ## Changing location
 
 The dashboard now includes a **Change location** button in the footer. Search by city name or postal code and select a result. The selected city, coordinates, country code, and IANA timezone are stored in the browser's `localStorage`, so each Chromebox/computer can remember a different location without changing the GitHub-hosted files. The dashboard uses Open-Meteo's geocoding search to find cities and then sends the selected latitude, longitude, and timezone to Hebcal for calendar/zmanim calculations.
+
+
+## Location-specific prayer rules
+
+This build shows the parshah for the selected location only, displays Morid HaTal only for Israel, and omits the weekday Birkat HaShanim phrase from Shabbat/Yom Tov services.
