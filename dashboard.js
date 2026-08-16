@@ -190,7 +190,8 @@ async function calculateDashboard() {
   const maarivElements = [];
   let musafDisplay = "";
 
-  let seasonalPhrase = "Morid HaTal";
+  const isIsraelLocation = CONFIG.countryCode === "IL";
+  let seasonalPhrase = isIsraelLocation ? "Morid HaTal" : "";
   let isMevarchim = false;
   let mevarchimTitle = "";
   let moladInfo = "";
@@ -316,11 +317,15 @@ async function calculateDashboard() {
       isHoliday = true;
 
       if (/Shemini Atzeret/i.test(title)) {
-        seasonalPhrase = "Morid HaTal (Shacharit) / Mashiv HaRuach (Musaf)";
+        seasonalPhrase = isIsraelLocation
+          ? "Morid HaTal (Shacharit) / Mashiv HaRuach (Musaf)"
+          : " / Mashiv HaRuach (Musaf)";
       } else if (/Pesach I:/i.test(title)) {
-        seasonalPhrase = "Mashiv HaRuach (Shacharit) / Morid HaTal (Musaf)";
+        seasonalPhrase = isIsraelLocation
+          ? "Mashiv HaRuach (Shacharit) / Morid HaTal (Musaf)"
+          : "Mashiv HaRuach (Shacharit) / ";
       } else if (/Pesach|Shavuot|Sukkot/i.test(title) && !/Sukkot Ch/i.test(title)) {
-        seasonalPhrase = "Morid HaTal";
+        seasonalPhrase = isIsraelLocation ? "Morid HaTal" : "";
       }
 
       if (/Rosh Chodesh/i.test(title)) {
@@ -406,7 +411,7 @@ async function calculateDashboard() {
 
   // In this dashboard's minhag, Morid HaTal is displayed only in Israel.
   // Mashiv HaRuach remains location-independent.
-  if (CONFIG.countryCode !== "IL") {
+  if (!isIsraelLocation) {
     if (/Morid HaTal/i.test(shachSeason)) shachSeason = "";
     if (/Morid HaTal/i.test(musafSeason)) musafSeason = "";
     if (/Morid HaTal/i.test(minchaSeason)) minchaSeason = "";
