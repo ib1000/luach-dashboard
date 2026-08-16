@@ -158,8 +158,7 @@ function buildUrls(today, lookahead) {
     zmanim: `${HEB}/zmanim?cfg=json&${loc}&date=${today}`,
     zmanimTomorrow: `${HEB}/zmanim?cfg=json&${loc}&date=${addDays(today, 1)}`,
     calendar: `${HEB}/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&ss=on&mf=on&c=on&F=on&d=on&b=on&molad=on&mvch=on&i=${israel}&${loc}&start=${today}&end=${lookahead}`,
-    shabbatDiaspora: `${HEB}/shabbat?cfg=json&${loc}&i=off`,
-    shabbatIsrael: `${HEB}/shabbat?cfg=json&i=on`,
+    shabbat: `${HEB}/shabbat?cfg=json&${loc}&i=${israel}`,
   };
 }
 
@@ -172,9 +171,9 @@ async function calculateDashboard() {
   const wday = perlWday(today);
 
   const urls = buildUrls(today, lookahead);
-  const [zmanimData, zmanimTomorrowData, calData, shabDiasp, shabIsrael] = await Promise.all([
+  const [zmanimData, zmanimTomorrowData, calData, shabbatData] = await Promise.all([
     fetchJson(urls.zmanim), fetchJson(urls.zmanimTomorrow), fetchJson(urls.calendar),
-    fetchJson(urls.shabbatDiaspora), fetchJson(urls.shabbatIsrael),
+    fetchJson(urls.shabbat),
   ]);
 
   let hebrewDate = "";
@@ -198,12 +197,10 @@ async function calculateDashboard() {
   let isBeforeShavuot = false;
   let isBeforeTishaBav = false;
 
-  // Show only the parshah that applies to the selected location.
-  // Israel follows the Israel cycle; every other location follows Diaspora.
+  // Use exactly one parshah cycle: Israel for Israeli locations, Diaspora elsewhere.
+  // Never compare or append the other cycle.
   let parshahDisplay = "No Parshah This Week";
-  const diasporaParsha = (shabDiasp.items || []).find(i => i.category === "parashat")?.title || "";
-  const israelParsha = (shabIsrael.items || []).find(i => i.category === "parashat")?.title || "";
-  const locationParsha = CONFIG.countryCode === "IL" ? israelParsha : diasporaParsha;
+  const locationParsha = (shabbatData.items || []).find(i => i.category === "parashat")?.title || "";
   if (locationParsha) parshahDisplay = locationParsha;
 
   let hasYaalehShach = false, hasYaalehMincha = false, hasYaalehMaariv = false;
