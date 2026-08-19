@@ -44,7 +44,6 @@ const CONFIG = {
 const HEB = "https://www.hebcal.com";
 let refreshTimer = null;
 let hebrewDateBoundaryTimer = null;
-let gregorianMidnightTimer = null;
 let lastData = null;
 
 const $ = (id) => document.getElementById(id);
@@ -99,50 +98,6 @@ function humanDate(iso, opts = {}) {
     year: opts.year === false ? undefined : "numeric",
     weekday: opts.weekday ? "long" : undefined,
   }).format(dt);
-}
-
-function currentGregorianIso() {
-  return ymd(datePartsInZone(new Date()));
-}
-
-function renderGregorianDateNow() {
-  const el = $("gregorian-date");
-  if (el) el.textContent = humanDate(currentGregorianIso(), {weekday:true});
-}
-
-function findNextMidnightInConfiguredZone() {
-  const now = Date.now();
-  const today = ymd(datePartsInZone(new Date(now)));
-
-  // Find a point after the next local date boundary, then binary-search back
-  // to approximately the first second of the new civil day. This is based
-  // entirely on CONFIG.timezone, not the computer's own timezone.
-  let lo = now;
-  let hi = now + 27 * 3600000;
-  while (ymd(datePartsInZone(new Date(hi))) === today) hi += 6 * 3600000;
-
-  while (hi - lo > 1000) {
-    const mid = Math.floor((lo + hi) / 2);
-    if (ymd(datePartsInZone(new Date(mid))) === today) lo = mid;
-    else hi = mid;
-  }
-  return new Date(hi);
-}
-
-function scheduleGregorianMidnightBoundary() {
-  if (gregorianMidnightTimer) clearTimeout(gregorianMidnightTimer);
-  gregorianMidnightTimer = null;
-
-  renderGregorianDateNow();
-  const target = findNextMidnightInConfiguredZone();
-  const delay = Math.max(1000, target.getTime() - Date.now() + 1000);
-
-  gregorianMidnightTimer = setTimeout(() => {
-    // Advance the visible Gregorian date immediately at midnight in the
-    // selected location, then refresh all date-dependent dashboard data.
-    renderGregorianDateNow();
-    refreshDashboard();
-  }, delay);
 }
 
 function dayName(iso) {
@@ -752,9 +707,7 @@ function renderDashboard(data) {
   lastData=data;
   setHebrewDateHeading(data);
   scheduleHebrewDateBoundary(data);
-  // Gregorian date always follows the selected location's timezone.
-  renderGregorianDateNow();
-  scheduleGregorianMidnightBoundary();
+  $("gregorian-date").textContent=humanDate(data.updated.date,{weekday:true});
   $("location-label").textContent=`${CONFIG.name} · ${CONFIG.timezone}`;
   renderFacts(data.calendar); renderTefillah(data.tefillah); renderZmanim(data.zmanim); renderCandles(data.candle_lighting); renderEvents(data.upcoming_events);
   $("error-banner").hidden=true;
@@ -885,12 +838,8 @@ function selectLocation(result) {
 
   if (refreshTimer) clearTimeout(refreshTimer);
   if (hebrewDateBoundaryTimer) clearTimeout(hebrewDateBoundaryTimer);
-  if (gregorianMidnightTimer) clearTimeout(gregorianMidnightTimer);
   lastData = null;
-  // Change the visible clock/date immediately using the NEW location's timezone,
-  // before waiting for any network response.
   updateClock();
-  scheduleGregorianMidnightBoundary();
   refreshDashboard();
 }
 
@@ -942,8 +891,5 @@ function updateClock() {
 window.addEventListener("load",()=>{
   setupLocationControls();
   $("location-label").textContent=`${CONFIG.name} · ${CONFIG.timezone}`;
-  updateClock();
-  scheduleGregorianMidnightBoundary();
-  setInterval(updateClock,1000);
-  refreshDashboard();
+  updateClock(); setInterval(updateClock,1000); refreshDashboard();
 });
