@@ -55,3 +55,8 @@ The dashboard now includes a **Change location** button in the footer. Search by
 ## Location-specific prayer rules
 
 This build shows the parshah for the selected location only, displays Morid HaTal only for Israel, and omits the weekday Birkat HaShanim phrase from Shabbat/Yom Tov services.
+
+## Version 17 display updates
+- TODAY no longer shows Tachanun status.
+- Shacharit shows a Torah-reading modification whenever the dashboard rules identify a reading, including standard Monday/Thursday 3-Aliyot readings.
+- Candle-lighting rows omit the event title and show only their timing information.

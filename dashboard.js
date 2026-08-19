@@ -432,6 +432,12 @@ async function calculateDashboard() {
     if (!extraMincha.includes("Nachem")) extraMincha.push("Torah: 3 Aliyot + Haftarah", "Nachem", "Aneinu");
   }
 
+  // Standard weekday Torah reading: Monday and Thursday Shacharit.
+  // Do not add it when a special-day Torah reading has already been assigned.
+  if ((wday === 2 || wday === 5) && !torahShach.length) {
+    torahShach.push("Torah: 3 Aliyot");
+  }
+
   // Friday / Shabbat overrides.
   if (wday === 6) {
     tachanunMincha = false;
@@ -618,7 +624,6 @@ function renderFacts(calendar) {
   const rows = [
     ["Parshah", calendar.parshah],
     ["Holiday", calendar.is_holiday ? (calendar.holidays?.join(", ") || "Yes") : "No"],
-    ["Tachanun", calendar.tachanun],
     ["Daf Yomi", calendar.daf_yomi],
   ];
   const dl = $("today-facts"); dl.replaceChildren();
@@ -681,7 +686,9 @@ function renderCandles(entries) {
     const a=document.createElement("article"); a.className="stack-item";
     const title=document.createElement("div"); title.className="stack-item-title"; title.textContent=`${e.day} · ${e.text_date}`;
     const meta=document.createElement("div"); meta.className="stack-item-meta";
-    meta.textContent=e.type==="not_before" ? `Not before ${e.not_before} · ${e.title}` : `Earliest (Plag): ${e.earliest_plag} · Latest: ${e.latest} · ${e.title}`;
+    meta.textContent=e.type==="not_before"
+      ? `Latest: ${e.not_before}`
+      : `Earliest (Plag): ${e.earliest_plag} · Latest: ${e.latest}`;
     a.append(title,meta); list.append(a);
   }
 }
