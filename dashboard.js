@@ -15,6 +15,7 @@ const DEFAULT_LOCATION = {
 };
 
 const LOCATION_STORAGE_KEY = "luach-dashboard-location-v1";
+const TIME_FORMAT_STORAGE_KEY = "luach-dashboard-time-format-v1";
 
 function loadSavedLocation() {
   try {
@@ -46,6 +47,8 @@ let refreshTimer = null;
 let hebrewDateBoundaryTimer = null;
 let gregorianMidnightTimer = null;
 let lastData = null;
+let timeFormat = localStorage.getItem(TIME_FORMAT_STORAGE_KEY) === "12" ? "12" : "24";
+let nextRefreshTarget = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -178,16 +181,39 @@ function usesShortenedKabbalatShabbat(title, category = "") {
   return /Chol HaMoed|^Pesach(?:\s|$)|^Shavuot(?:\s|$)|^Sukkot(?:\s|$)|^Shemini Atzeret(?:\s|$)|^Simchat Torah(?:\s|$)|^Rosh Hashana(?:\s|$)|^Yom Kippur(?:\s|$)/i.test(t);
 }
 
-function hhmmFromIso(value) {
-  if (!value) return "--:--";
-  const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return "--:--";
-  return new Intl.DateTimeFormat("en-CA", {
+function formatTime(dateOrIso, { seconds = false } = {}) {
+  const dt = dateOrIso instanceof Date ? dateOrIso : new Date(dateOrIso);
+  if (Number.isNaN(dt.getTime())) return seconds ? "--:--:--" : "--:--";
+  const opts = {
     timeZone: CONFIG.timezone,
-    hour: "2-digit",
+    hour: timeFormat === "12" ? "numeric" : "2-digit",
     minute: "2-digit",
-    hourCycle: "h23",
-  }).format(dt);
+    hour12: timeFormat === "12",
+  };
+  if (seconds) opts.second = "2-digit";
+  if (timeFormat === "24") opts.hourCycle = "h23";
+  let text = new Intl.DateTimeFormat("en-US", opts).format(dt);
+  if (timeFormat === "12") text = text.replace(/\s*([AP]M)$/i, (_, ap) => ` ${ap.toLowerCase()}`);
+  return text;
+}
+
+function hhmmFromIso(value) {
+  return formatTime(value);
+}
+
+function renderTimeFormatDependentFields() {
+  if ($("time-format")) $("time-format").value = timeFormat;
+  updateClock();
+  if (lastData) {
+    renderZmanim(lastData.zmanim);
+    renderCandles(lastData.candle_lighting);
+    if (lastData.updated?.epoch) {
+      $("update-status").textContent = `Data updated ${formatTime(new Date(lastData.updated.epoch))}; next refresh scheduled automatically`;
+    }
+  }
+  if (nextRefreshTarget) {
+    $("next-refresh").textContent = `Next API refresh: ${formatTime(nextRefreshTarget, {seconds:true})}`;
+  }
 }
 
 async function fetchJson(url) {
@@ -547,19 +573,19 @@ async function calculateDashboard() {
     const m = String(item.date || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
     if (!m) continue;
     const iso = `${m[1]}-${m[2]}-${m[3]}`;
-    const latest = `${m[4]}:${m[5]}`;
+    const latestIso = String(item.date || "");
     const day = dayName(iso);
-    const entry = { date: iso, day, text_date: humanDate(iso,{year:false}), title:item.title, latest };
+    const entry = { date: iso, day, text_date: humanDate(iso,{year:false}), title:item.title, latest_iso: latestIso };
     if (day === "Saturday" || /Yom Tov|Second Day|after/i.test(item.title || "")) {
       entry.type = "not_before";
-      entry.not_before = latest;
+      entry.not_before_iso = latestIso;
     } else {
       entry.type = "before_sunset";
       try {
         const z = await fetchJson(`${HEB}/zmanim?cfg=json&latitude=${CONFIG.latitude}&longitude=${CONFIG.longitude}&tzid=${encodeURIComponent(CONFIG.timezone)}&date=${iso}`);
-        entry.earliest_plag = hhmmFromIso(z?.times?.plagHaMincha);
+        entry.earliest_plag_iso = z?.times?.plagHaMincha || "";
       } catch {
-        entry.earliest_plag = "--:--";
+        entry.earliest_plag_iso = "";
       }
     }
     candleLighting.push(entry);
@@ -674,7 +700,7 @@ function renderZmanim(data) {
   z.forEach((item,i)=>{
     const row=document.createElement("div"); row.className=`zman-row${i===next?" next":""}`;
     const l=document.createElement("span"); l.className="zman-label"; l.textContent=item.label;
-    const tm=document.createElement("span"); tm.className="zman-time"; tm.textContent=item.time;
+    const tm=document.createElement("span"); tm.className="zman-time"; tm.textContent=formatTime(item.iso);
     row.append(l,tm); list.append(row);
   });
 }
@@ -687,8 +713,8 @@ function renderCandles(entries) {
     const title=document.createElement("div"); title.className="stack-item-title"; title.textContent=`${e.day} · ${e.text_date}`;
     const meta=document.createElement("div"); meta.className="stack-item-meta";
     meta.textContent=e.type==="not_before"
-      ? `Latest: ${e.not_before}`
-      : `Earliest (Plag): ${e.earliest_plag} · Latest: ${e.latest}`;
+      ? `Latest: ${formatTime(e.not_before_iso)}`
+      : `Earliest (Plag): ${formatTime(e.earliest_plag_iso)} · Latest: ${formatTime(e.latest_iso)}`;
     a.append(title,meta); list.append(a);
   }
 }
@@ -766,7 +792,7 @@ function renderDashboard(data) {
   renderFacts(data.calendar); renderTefillah(data.tefillah); renderZmanim(data.zmanim); renderCandles(data.candle_lighting); renderEvents(data.upcoming_events);
   $("error-banner").hidden=true;
   $("status-dot").className="status-dot ok";
-  $("update-status").textContent=`Data updated ${data.updated.time}; next refresh scheduled automatically`;
+  $("update-status").textContent=`Data updated ${formatTime(new Date(data.updated.epoch))}; next refresh scheduled automatically`;
 }
 
 function nextRefreshDate(data) {
@@ -795,8 +821,8 @@ function scheduleNextRefresh(data) {
   const target=nextRefreshDate(data);
   const delay=Math.max(5000, target.getTime()-Date.now()+CONFIG.refreshCushionMs);
   refreshTimer=setTimeout(refreshDashboard, delay);
-  const when=new Intl.DateTimeFormat("en-US", {timeZone:CONFIG.timezone,hour:"numeric",minute:"2-digit",second:"2-digit"}).format(target);
-  $("next-refresh").textContent=`Next API refresh: ${when}`;
+  nextRefreshTarget = target;
+  $("next-refresh").textContent=`Next API refresh: ${formatTime(target, {seconds:true})}`;
 }
 
 
@@ -922,6 +948,17 @@ function setupLocationControls() {
   });
 }
 
+function setupTimeFormatControl() {
+  const select = $("time-format");
+  if (!select) return;
+  select.value = timeFormat;
+  select.addEventListener("change", () => {
+    timeFormat = select.value === "12" ? "12" : "24";
+    localStorage.setItem(TIME_FORMAT_STORAGE_KEY, timeFormat);
+    renderTimeFormatDependentFields();
+  });
+}
+
 async function refreshDashboard() {
   if (refreshTimer) clearTimeout(refreshTimer);
   $("status-dot").className="status-dot";
@@ -940,7 +977,7 @@ async function refreshDashboard() {
 
 function updateClock() {
   const now=new Date();
-  $("live-clock").textContent=new Intl.DateTimeFormat("en-CA", {timeZone:CONFIG.timezone,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).format(now);
+  $("live-clock").textContent=formatTime(now, {seconds:true});
   if (lastData) {
     renderZmanim(lastData.zmanim);
   }
@@ -948,6 +985,7 @@ function updateClock() {
 
 window.addEventListener("load",()=>{
   setupLocationControls();
+  setupTimeFormatControl();
   $("location-label").textContent=`${CONFIG.name} · ${CONFIG.timezone}`;
   updateClock();
   scheduleGregorianMidnightBoundary();

@@ -60,3 +60,7 @@ This build shows the parshah for the selected location only, displays Morid HaTa
 - TODAY no longer shows Tachanun status.
 - Shacharit shows a Torah-reading modification whenever the dashboard rules identify a reading, including standard Monday/Thursday 3-Aliyot readings.
 - Candle-lighting rows omit the event title and show only their timing information.
+
+
+## Time format
+Use the selector beside **Change location** to choose **24-hour** or **12-hour** display. The choice is saved on that device. In 12-hour mode, `am` and `pm` are shown in lower case.
