@@ -228,7 +228,7 @@ function buildUrls(today, lookahead) {
   return {
     zmanim: `${HEB}/zmanim?cfg=json&${loc}&date=${today}`,
     zmanimTomorrow: `${HEB}/zmanim?cfg=json&${loc}&date=${addDays(today, 1)}`,
-    calendar: `${HEB}/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&ss=on&mf=on&c=on&F=on&dpa=on&d=on&b=on&molad=on&mvch=on&i=${israel}&${loc}&start=${today}&end=${lookahead}`,
+    calendar: `${HEB}/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&ss=on&mf=on&c=on&F=on&d=on&b=on&molad=on&mvch=on&i=${israel}&${loc}&start=${today}&end=${lookahead}`,
     shabbat: `${HEB}/shabbat?cfg=json&${loc}&i=${israel}`,
   };
 }
@@ -561,49 +561,6 @@ async function calculateDashboard() {
   if (hasYaalehMincha) minchaElements.push("Yaaleh Veyavo");
   if (hasAlHanissimMincha) minchaElements.push("Al HaNissim");
   minchaElements.push(...extraMincha);
-
-  // Shabbat-afternoon seasonal study/Tehillim custom (Ashkenaz).
-  // Hebcal's dpa=on feed supplies the correct Pirkei Avot chapter(s)
-  // between Pesach and Rosh Hashanah. In the winter, Barchi Nafshi
-  // begins on Shabbat Bereishit. Shabbat HaGadol uses Avadim Hayinu instead.
-  if (wday === 7) {
-    const pirkeiItem = items.find(item =>
-      String(item.date || "").slice(0, 10) === today &&
-      /^Pirkei Avot\s+/i.test(String(item.title || ""))
-    );
-
-    if (pirkeiItem) {
-      const raw = String(pirkeiItem.title || "").trim();
-      const m = raw.match(/^Pirkei Avot\s+([0-9]+)(?:-([0-9]+))?$/i);
-      if (m) {
-        minchaElements.push(m[2]
-          ? `Pirkei Avot: Chapters ${m[1]}-${m[2]}`
-          : `Pirkei Avot: Chapter ${m[1]}`);
-      } else {
-        minchaElements.push(raw);
-      }
-    } else {
-      const shabbatHaGadol = items.some(item =>
-        String(item.date || "").slice(0, 10) === today &&
-        /Shabbat HaGadol/i.test(String(item.title || ""))
-      );
-      const shabbatShuva = items.some(item =>
-        String(item.date || "").slice(0, 10) === today &&
-        /Shabbat Shuva/i.test(String(item.title || ""))
-      );
-      const isBereishitOrWinter =
-        /(?:Parashat|Parashas) Bereshit/i.test(parshahDisplay) ||
-        /Cheshvan|Kislev|Tevet|Shevat|Adar|Nisan/i.test(hMonth) ||
-        (/Tishrei/i.test(hMonth) && hDay >= 24);
-
-      if (shabbatHaGadol) {
-        minchaElements.push("Avadim Hayinu (instead of Barchi Nafshi)");
-      } else if (!shabbatShuva && isBereishitOrWinter) {
-        minchaElements.push("Barchi Nafshi");
-      }
-    }
-  }
-
   if ((!tachanunMincha || !tachanunToday) && wday !== 7) minchaElements.push("No Tachanun");
 
   if (maarivSeason) maarivElements.push(maarivSeason);
