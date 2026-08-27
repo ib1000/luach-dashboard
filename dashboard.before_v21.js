@@ -100,7 +100,7 @@ function humanDate(iso, opts = {}) {
     month: opts.short ? "short" : "long",
     day: "numeric",
     year: opts.year === false ? undefined : "numeric",
-    weekday: opts.weekday === "short" ? "short" : (opts.weekday ? "long" : undefined),
+    weekday: opts.weekday ? "long" : undefined,
   }).format(dt);
 }
 
@@ -645,10 +645,10 @@ async function calculateDashboard() {
     candleLighting.push(entry);
   }
 
-  const zmanKeys = ["alotHaShachar","misheyakir","sunrise","sofZmanShmaMGA","sofZmanShma","sofZmanTfillaMGA","sofZmanTfilla","chatzot","minchaGedola","minchaKetana","plagHaMincha","sunset","tzeit42min","chatzotNight"];
+  const zmanKeys = ["alotHaShachar","misheyakir","sunrise","sofZmanShmaMGA","sofZmanShma","sofZmanTfilla","chatzot","minchaGedola","minchaKetana","plagHaMincha","sunset","tzeit42min","chatzotNight"];
   const labels = {
     alotHaShachar:"Alot HaShachar (Dawn)", misheyakir:"Misheyakir (Tallit)", sunrise:"Netz Hachamah (Sunrise)",
-    sofZmanShmaMGA:"Sof Zman Shma (MGA)", sofZmanShma:"Sof Zman Shma (Gra)", sofZmanTfillaMGA:"Sof Zman Tefillah (MGA)", sofZmanTfilla:"Sof Zman Tefillah (Gra)",
+    sofZmanShmaMGA:"Sof Zman Shma (MGA)", sofZmanShma:"Sof Zman Shma (Gra)", sofZmanTfilla:"Sof Zman Tefillah (Gra)",
     chatzot:"Chatzot (Midday)", minchaGedola:"Mincha Gedolah", minchaKetana:"Mincha Ketanah",
     plagHaMincha:"Plag HaMincha", sunset:"Shkiat HaChamah (Sunset)", tzeit42min:"Tzeit HaKochavim (42m)", chatzotNight:"Chatzot (Midnight)",
   };
@@ -678,18 +678,11 @@ async function calculateDashboard() {
   });
 
   const upcomingEvents = items
-    .filter(item => {
-      const title = String(item.title || "").trim();
-      return (item.category === "holiday" || item.category === "roshchodesh")
-        && String(item.date || "").slice(0,10) > today
-        && !/Mevarchim|Molad/i.test(title)
-        && !/^Erev\b/i.test(title);
-    })
+    .filter(item => (item.category === "holiday" || item.category === "roshchodesh") && String(item.date || "").slice(0,10) > today && !/Mevarchim|Molad/i.test(item.title || ""))
     .map(item => {
       const iso = String(item.date || "").slice(0,10);
-      return { title:item.title, category:item.category, date:iso, text_date:humanDate(iso, {weekday:"short"}) };
-    })
-    .slice(0, 10);
+      return { title:item.title, category:item.category, date:iso, text_date:humanDate(iso) };
+    });
 
   const mevarchimNote = (isMevarchim || moladInfo)
     ? `Shabbat Mevarchim (${mevarchimTitle || "Blessing of the New Month"}) occurs ${wday === 6 ? "tomorrow" : "today"}`
@@ -782,7 +775,7 @@ function renderCandles(entries) {
 
 function renderEvents(entries) {
   const list=$("event-list"); list.replaceChildren();
-  if (!entries?.length) { list.innerHTML='<div class="empty-state">No upcoming events found.</div>'; return; }
+  if (!entries?.length) { list.innerHTML='<div class="empty-state">No major events noted for the next 30 days.</div>'; return; }
   for (const e of entries) {
     const a=document.createElement("article"); a.className="event-item";
     const title=document.createElement("div"); title.className="event-title"; title.textContent=e.title;
