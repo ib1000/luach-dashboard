@@ -759,7 +759,9 @@ function renderZmanim(data) {
     }
   });
   z.forEach((item,i)=>{
-    const row=document.createElement("div"); row.className=`zman-row${i===next?" next":""}`;
+    const row=document.createElement("div");
+    const sectionBreak = ["sunrise","sofZmanTfilla","plagHaMincha"].includes(item.key);
+    row.className=`zman-row${i===next?" next":""}${sectionBreak?" accent-divider":""}`;
     const l=document.createElement("span"); l.className="zman-label"; l.textContent=item.label;
     const tm=document.createElement("span"); tm.className="zman-time"; tm.textContent=formatTime(item.iso);
     row.append(l,tm); list.append(row);
