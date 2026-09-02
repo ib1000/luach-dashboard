@@ -47,7 +47,7 @@ let refreshTimer = null;
 let hebrewDateBoundaryTimer = null;
 let gregorianMidnightTimer = null;
 let lastData = null;
-let timeFormat = localStorage.getItem(TIME_FORMAT_STORAGE_KEY) === "12" ? "12" : "24";
+let timeFormat = localStorage.getItem(TIME_FORMAT_STORAGE_KEY) === "24" ? "24" : "12";
 let nextRefreshTarget = null;
 
 const $ = (id) => document.getElementById(id);
@@ -646,8 +646,9 @@ async function calculateDashboard() {
   }
 
   const zmanKeys = ["alotHaShachar","misheyakir","sunrise","sofZmanShmaMGA","sofZmanShma","sofZmanTfillaMGA","sofZmanTfilla","chatzot","minchaGedola","minchaKetana","plagHaMincha","sunset","tzeit42min","chatzotNight"];
+  const tefillinWornToday = !shabbatToday && !yomTovToday;
   const labels = {
-    alotHaShachar:"Alot HaShachar (Dawn)", misheyakir:"Misheyakir (Tallit)", sunrise:"Netz Hachamah (Sunrise)",
+    alotHaShachar:"Alot HaShachar (Dawn)", misheyakir:tefillinWornToday ? "Misheyakir (Tallit and Tefillin)" : "Misheyakir (Tallit)", sunrise:"Netz Hachamah (Sunrise)",
     sofZmanShmaMGA:"Sof Zman Shma (MGA)", sofZmanShma:"Sof Zman Shma (Gra)", sofZmanTfillaMGA:"Sof Zman Tefillah (MGA)", sofZmanTfilla:"Sof Zman Tefillah (Gra)",
     chatzot:"Chatzot (Midday)", minchaGedola:"Mincha Gedolah", minchaKetana:"Mincha Ketanah",
     plagHaMincha:"Plag HaMincha", sunset:"Shkiat HaChamah (Sunset)", tzeit42min:"Tzeit HaKochavim (42m)", chatzotNight:"Chatzot (Midnight)",
@@ -775,9 +776,18 @@ function renderCandles(entries) {
     const a=document.createElement("article"); a.className="stack-item";
     const title=document.createElement("div"); title.className="stack-item-title"; title.textContent=`${e.day} · ${e.text_date}`;
     const meta=document.createElement("div"); meta.className="stack-item-meta";
-    meta.textContent=e.type==="not_before"
-      ? `Latest: ${formatTime(e.not_before_iso)}`
-      : `Earliest (Plag): ${formatTime(e.earliest_plag_iso)} · Latest: ${formatTime(e.latest_iso)}`;
+    const hasEarliest = !!e.earliest_plag_iso && !Number.isNaN(new Date(e.earliest_plag_iso).getTime());
+    const latestIso = e.type === "not_before" ? e.not_before_iso : e.latest_iso;
+    const hasLatest = !!latestIso && !Number.isNaN(new Date(latestIso).getTime());
+    if (hasEarliest && hasLatest) {
+      meta.textContent = `Earliest (Plag): ${formatTime(e.earliest_plag_iso)} · Latest: ${formatTime(latestIso)}`;
+    } else if (hasLatest) {
+      meta.textContent = `After: ${formatTime(latestIso)}`;
+    } else if (hasEarliest) {
+      meta.textContent = `Before: ${formatTime(e.earliest_plag_iso)}`;
+    } else {
+      meta.textContent = "Time unavailable";
+    }
     a.append(title,meta); list.append(a);
   }
 }
