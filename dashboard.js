@@ -772,8 +772,10 @@ function renderZmanim(data) {
 function renderCandles(entries) {
   const list=$("candle-list"); list.replaceChildren();
   if (!entries?.length) { list.innerHTML='<div class="empty-state">No upcoming candle-lighting events found.</div>'; return; }
+  const today = currentGregorianIso();
   for (const e of entries) {
-    const a=document.createElement("article"); a.className="stack-item";
+    const a=document.createElement("article");
+    a.className=`stack-item${e.date === today ? " today" : ""}`;
     const title=document.createElement("div"); title.className="stack-item-title"; title.textContent=`${e.day} · ${e.text_date}`;
     const meta=document.createElement("div"); meta.className="stack-item-meta";
     const hasEarliest = !!e.earliest_plag_iso && !Number.isNaN(new Date(e.earliest_plag_iso).getTime());
