@@ -613,6 +613,14 @@ async function calculateDashboard() {
   maarivElements.push(...extraMaar);
   if (isLeDavidMaariv) maarivElements.push("Le'David");
 
+  // If Motzaei Shabbat uses the weekday Amidah, always list it first.
+  const atahChonantanu = "Weekday Amidah (with Atah Chonantanu)";
+  const atahChonantanuIndex = maarivElements.indexOf(atahChonantanu);
+  if (atahChonantanuIndex > 0) {
+    maarivElements.splice(atahChonantanuIndex, 1);
+    maarivElements.unshift(atahChonantanu);
+  }
+
   const tachanunDisplay = !tachanunToday
     ? `No (${tachanunReason})`
     : (!tachanunMincha ? "Yes (Omitted at Mincha)" : "Yes (Standard Weekday)");
