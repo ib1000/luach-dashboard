@@ -229,7 +229,6 @@ function buildUrls(today, lookahead) {
     zmanim: `${HEB}/zmanim?cfg=json&${loc}&date=${today}`,
     zmanimTomorrow: `${HEB}/zmanim?cfg=json&${loc}&date=${addDays(today, 1)}`,
     calendar: `${HEB}/hebcal?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&ss=on&mf=on&c=on&F=on&dpa=on&d=on&b=on&molad=on&mvch=on&i=${israel}&${loc}&start=${today}&end=${lookahead}`,
-    shabbat: `${HEB}/shabbat?cfg=json&${loc}&i=${israel}`,
   };
 }
 
@@ -242,9 +241,8 @@ async function calculateDashboard() {
   const wday = perlWday(today);
 
   const urls = buildUrls(today, lookahead);
-  const [zmanimData, zmanimTomorrowData, calData, shabbatData] = await Promise.all([
+  const [zmanimData, zmanimTomorrowData, calData] = await Promise.all([
     fetchJson(urls.zmanim), fetchJson(urls.zmanimTomorrow), fetchJson(urls.calendar),
-    fetchJson(urls.shabbat),
   ]);
 
   let hebrewDate = "";
@@ -270,16 +268,20 @@ async function calculateDashboard() {
   let isBeforeTishaBav = false;
 
   // Use exactly one parshah cycle: Israel for Israeli locations, Diaspora elsewhere.
-  // Never compare or append the other cycle.
-  let parshahDisplay = "No Parshah This Week";
-  const locationParsha = (shabbatData.items || []).find(i => i.category === "parashat")?.title || "";
-  if (locationParsha) parshahDisplay = locationParsha;
+  // Find the next Shabbat on which a regular weekly parshah is actually read.
+  // The calendar feed omits a parashat event on festival Shabbatot, so searching
+  // forward automatically skips those weeks.
+  let parshahDisplay = "No upcoming Parshah found";
 
   let hasYaalehShach = false, hasYaalehMincha = false, hasYaalehMaariv = false;
   let hasAlHanissimShach = false, hasAlHanissimMincha = false, hasAlHanissimMaariv = false;
   const hallelShach = [], torahShach = [], otherShach = [], extraMincha = [], extraMaar = [];
 
   const items = calData.items || [];
+  const nextParshaItem = items
+    .filter(item => item?.category === "parashat" && String(item?.date || "").slice(0, 10) >= today)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  if (nextParshaItem?.title) parshahDisplay = nextParshaItem.title;
 
   // A service uses the weekday Amidah rain/dew blessing only on a weekday.
   // Keep Chol HaMoed as weekday for this purpose; suppress the blessing only
