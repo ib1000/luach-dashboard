@@ -208,11 +208,11 @@ function renderTimeFormatDependentFields() {
     renderZmanim(lastData.zmanim);
     renderCandles(lastData.candle_lighting);
     if (lastData.updated?.epoch) {
-      $("update-status").textContent = `Data updated ${formatTime(new Date(lastData.updated.epoch))}; next refresh scheduled automatically`;
+      $("update-status").textContent = `Data updated ${formatTime(new Date(lastData.updated.epoch))}`;
     }
   }
   if (nextRefreshTarget) {
-    $("next-refresh").textContent = `Next API refresh: ${formatTime(nextRefreshTarget, {seconds:true})}`;
+    $("next-refresh").textContent = `Next Hebcal API refresh: ${formatTime(nextRefreshTarget, {seconds:true})}`;
   }
 }
 
@@ -556,6 +556,34 @@ async function calculateDashboard() {
   }
   if (isLeDavidDay) shachElements.push("Le'David");
 
+  // Ashkenazic Selichot before Rosh Hashanah: begin on Sunday morning
+  // following Leil Selichot. If the nearest Sunday would provide fewer
+  // than four mornings before Rosh Hashanah, begin one Sunday earlier.
+  // Fast-day Selichot may already have been added above. In either case,
+  // keep Selichot as the first Shacharit entry.
+  const roshHashanaI = items.find(item =>
+    /^Rosh Hashana I$/i.test(String(item.title || ""))
+  );
+  let preRoshHashanaSelichot = false;
+  if (roshHashanaI && wday !== 7) {
+    const rhDate = String(roshHashanaI.date || "").slice(0, 10);
+    if (rhDate) {
+      const rh = new Date(`${rhDate}T12:00:00Z`);
+      const rhWeekday = rh.getUTCDay(); // Sun=0 ... Sat=6
+      let daysBackToSunday = rhWeekday;
+      if (daysBackToSunday < 4) daysBackToSunday += 7;
+      const start = new Date(rh.getTime() - daysBackToSunday * 86400000);
+      const startIso = start.toISOString().slice(0, 10);
+      preRoshHashanaSelichot = today >= startIso && today < rhDate;
+    }
+  }
+  if (wday !== 7 && (preRoshHashanaSelichot || otherShach.some(x => /^Selichot$/i.test(x)))) {
+    for (let i = shachElements.length - 1; i >= 0; i--) {
+      if (/^Selichot$/i.test(shachElements[i])) shachElements.splice(i, 1);
+    }
+    shachElements.unshift("Selichot");
+  }
+
   if (minchaSeason) minchaElements.push(minchaSeason);
   if (!shabbatToday && !yomTovToday) minchaElements.push(rainDew);
   if (hasYaalehMincha) minchaElements.push("Yaaleh Veyavo");
@@ -612,14 +640,6 @@ async function calculateDashboard() {
   if (hasAlHanissimMaariv) maarivElements.push("Al HaNissim");
   maarivElements.push(...extraMaar);
   if (isLeDavidMaariv) maarivElements.push("Le'David");
-
-  // If Motzaei Shabbat uses the weekday Amidah, always list it first.
-  const atahChonantanu = "Weekday Amidah (with Atah Chonantanu)";
-  const atahChonantanuIndex = maarivElements.indexOf(atahChonantanu);
-  if (atahChonantanuIndex > 0) {
-    maarivElements.splice(atahChonantanuIndex, 1);
-    maarivElements.unshift(atahChonantanu);
-  }
 
   const tachanunDisplay = !tachanunToday
     ? `No (${tachanunReason})`
@@ -875,7 +895,7 @@ function renderDashboard(data) {
   renderFacts(data.calendar); renderTefillah(data.tefillah); renderZmanim(data.zmanim); renderCandles(data.candle_lighting); renderEvents(data.upcoming_events);
   $("error-banner").hidden=true;
   $("status-dot").className="status-dot ok";
-  $("update-status").textContent=`Data updated ${formatTime(new Date(data.updated.epoch))}; next refresh scheduled automatically`;
+  $("update-status").textContent=`Data updated ${formatTime(new Date(data.updated.epoch))}`;
 }
 
 function nextRefreshDate(data) {
@@ -905,7 +925,7 @@ function scheduleNextRefresh(data) {
   const delay=Math.max(5000, target.getTime()-Date.now()+CONFIG.refreshCushionMs);
   refreshTimer=setTimeout(refreshDashboard, delay);
   nextRefreshTarget = target;
-  $("next-refresh").textContent=`Next API refresh: ${formatTime(target, {seconds:true})}`;
+  $("next-refresh").textContent=`Next Hebcal API refresh: ${formatTime(target, {seconds:true})}`;
 }
 
 
