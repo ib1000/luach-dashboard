@@ -563,9 +563,12 @@ async function calculateDashboard() {
   // than four mornings before Rosh Hashanah, begin one Sunday earlier.
   // Fast-day Selichot may already have been added above. In either case,
   // keep Selichot as the first Shacharit entry.
-  const roshHashanaI = items.find(item =>
-    /^Rosh Hashana I$/i.test(String(item.title || ""))
-  );
+  const roshHashanaI = items.find(item => {
+    const title = String(item.title || "");
+    return item.category === "holiday" &&
+      /^Rosh Hashana\b/i.test(title) &&
+      !/LaBehemot/i.test(title);
+  });
   let preRoshHashanaSelichot = false;
   if (roshHashanaI && wday !== 7) {
     const rhDate = String(roshHashanaI.date || "").slice(0, 10);
