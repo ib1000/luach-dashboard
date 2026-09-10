@@ -366,9 +366,17 @@ async function calculateDashboard() {
       if (/Rosh Chodesh|Chanukah|Purim|Pesach|Shavuot|Sukkot|Rosh Hashana|Yom Kippur|Shushan Purim|Tu Bishvat|Lag BaOmer|Tish'?a?\s*B'?av/i.test(title)) {
         tachanunMincha = false;
       }
-      if (/Rosh Chodesh|Pesach|Shavuot|Sukkot|Rosh Hashana|Yom Kippur/i.test(title)) {
+      // Ma'ariv follows the Hebrew day beginning tonight.  Only an actual
+      // Rosh Chodesh or Yom Tov on tomorrow's Gregorian date triggers
+      // Ya'aleh Veyavo; an Erev event (for example, "Erev Rosh Hashana")
+      // must not do so.
+      const isTomorrowRoshChodesh =
+        (category === "roshchodesh" || category === "holiday") &&
+        /^Rosh Chodesh(?:\s|$)/i.test(title);
+      const isTomorrowActualYomTov = isActualYomTov(item, tomorrow);
+      if (isTomorrowRoshChodesh || isTomorrowActualYomTov) {
         hasYaalehMaariv = true;
-      } else if (/Chanukah|Purim/i.test(title)) {
+      } else if (/^(?:Chanukah|Purim)(?:\s|$)/i.test(title)) {
         hasAlHanissimMaariv = true;
       }
     }
