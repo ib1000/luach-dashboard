@@ -586,7 +586,7 @@ async function calculateDashboard() {
 
   if (shachSeason) shachElements.push(shachSeason);
   if (!shabbatToday && !yomTovToday) shachElements.push(rainDew);
-  if (tenDaysToday) shachElements.push("HaMelech HaKadosh");
+  if (tenDaysToday) shachElements.push("Ha'Melech Ha'Kadosh");
   // Festival Amidah itself already incorporates Ya'aleh Veyavo.
   const shachHasFestivalAmidah = otherShach.some(x => /^Festival Amidah$/i.test(x));
   if (hasYaalehShach && !shachHasFestivalAmidah) shachElements.push("Yaaleh Veyavo");
@@ -647,7 +647,7 @@ async function calculateDashboard() {
   }
 
   if (minchaSeason) minchaElements.push(minchaSeason);
-  if (tenDaysToday) minchaElements.push("HaMelech HaKadosh");
+  if (tenDaysToday) minchaElements.push("Ha'Melech Ha'Kadosh");
   if (!shabbatToday && !yomTovToday) minchaElements.push(rainDew);
   const minchaHasFestivalAmidah = extraMincha.some(x => /^Festival Amidah$/i.test(x));
   if (hasYaalehMincha && !minchaHasFestivalAmidah) minchaElements.push("Yaaleh Veyavo");
@@ -713,7 +713,7 @@ async function calculateDashboard() {
   if (tenDaysToday && wday !== 6 && wday !== 7 && !isErevYomKippurToday) minchaElements.push("Avinu Malkeinu");
 
   if (maarivSeason) maarivElements.push(maarivSeason);
-  if (tenDaysTonight) maarivElements.push("HaMelech HaKadosh");
+  if (tenDaysTonight) maarivElements.push("Ha'Melech Ha'Kadosh");
   if (!shabbatTonight && !yomTovTomorrow) maarivElements.push(rainDew);
   if (yomTovTomorrow) maarivElements.push("Festival Amidah");
   if (hasYaalehMaariv && !yomTovTomorrow) maarivElements.push("Yaaleh Veyavo");
@@ -723,10 +723,27 @@ async function calculateDashboard() {
   if (isYomKippurTonight && !shabbatTonight) maarivElements.push("Avinu Malkeinu");
   if (isLeDavidMaariv) maarivElements.push("Le'David");
 
-  // Musaf uses an Amidah too, so HaMelech HaKadosh applies whenever Musaf
+  // When a Festival Amidah is shown, place the Ten Days modification immediately after it.
+  const placeHaMelechAfterFestivalAmidah = (elements) => {
+    const label = "Ha'Melech Ha'Kadosh";
+    // Remove any earlier occurrence first, because that can change the index
+    // of Festival Amidah. Then locate Festival Amidah again and insert the
+    // phrase directly after it, guaranteeing adjacency.
+    for (let i = elements.length - 1; i >= 0; i--) {
+      if (elements[i] === label) elements.splice(i, 1);
+    }
+    const festivalIndex = elements.findIndex(x => /^Festival Amidah$/i.test(x));
+    if (festivalIndex < 0) return;
+    elements.splice(festivalIndex + 1, 0, label);
+  };
+  placeHaMelechAfterFestivalAmidah(shachElements);
+  placeHaMelechAfterFestivalAmidah(minchaElements);
+  placeHaMelechAfterFestivalAmidah(maarivElements);
+
+  // Musaf uses an Amidah too, so Ha'Melech Ha'Kadosh applies whenever Musaf
   // exists during the Ten Days of Repentance. Avinu Malkeinu is not added
   // here as a general Musaf item.
-  const musafTenDays = (musafDisplay && tenDaysToday) ? ["HaMelech HaKadosh"] : [];
+  const musafTenDays = (musafDisplay && tenDaysToday) ? ["Ha'Melech Ha'Kadosh"] : [];
 
   const tachanunDisplay = !tachanunToday
     ? `No (${tachanunReason})`
