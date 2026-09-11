@@ -558,6 +558,15 @@ async function calculateDashboard() {
   const tomorrowHebrewDate = hebrewDateForGregorianDay(items, tomorrow);
   const tomorrowHebrew = parseHebrewDate(tomorrowHebrewDate);
 
+  // Aseret Yemei Teshuvah (1-10 Tishrei).  Daytime services use today's
+  // Hebrew date; Ma'ariv uses the Hebrew date that begins this evening.
+  const isTenDaysDate = (h) => /Tishrei/i.test(String(h?.month || "")) && Number(h?.day || 0) >= 1 && Number(h?.day || 0) <= 10;
+  const tenDaysToday = isTenDaysDate(currentHebrew);
+  const tenDaysTonight = isTenDaysDate(tomorrowHebrew);
+  const isErevYomKippurToday = /Tishrei/i.test(hMonth) && hDay === 9;
+  const isYomKippurToday = /Tishrei/i.test(hMonth) && hDay === 10;
+  const isYomKippurTonight = /Tishrei/i.test(String(tomorrowHebrew.month || "")) && Number(tomorrowHebrew.day || 0) === 10;
+
   let isIsraelRain = false, isDiaspRain = false;
   if (/Kislev|Tevet|Shevat|Adar/i.test(hMonth)) isIsraelRain = true;
   else if (/Cheshvan/i.test(hMonth) && hDay >= 7) isIsraelRain = true;
@@ -577,6 +586,7 @@ async function calculateDashboard() {
 
   if (shachSeason) shachElements.push(shachSeason);
   if (!shabbatToday && !yomTovToday) shachElements.push(rainDew);
+  if (tenDaysToday) shachElements.push("HaMelech HaKadosh");
   // Festival Amidah itself already incorporates Ya'aleh Veyavo.
   const shachHasFestivalAmidah = otherShach.some(x => /^Festival Amidah$/i.test(x));
   if (hasYaalehShach && !shachHasFestivalAmidah) shachElements.push("Yaaleh Veyavo");
@@ -629,7 +639,15 @@ async function calculateDashboard() {
     shachElements.unshift("Selichot");
   }
 
+  // Avinu Malkeinu during Aseret Yemei Teshuvah (Ashkenaz): normally
+  // Shacharit and Mincha on non-Shabbat days; omitted on Erev Yom Kippur.
+  // On Yom Kippur it is included in Shacharit and (for this dashboard) Mincha.
+  if (tenDaysToday && wday !== 7 && !isErevYomKippurToday) {
+    shachElements.push("Avinu Malkeinu");
+  }
+
   if (minchaSeason) minchaElements.push(minchaSeason);
+  if (tenDaysToday) minchaElements.push("HaMelech HaKadosh");
   if (!shabbatToday && !yomTovToday) minchaElements.push(rainDew);
   const minchaHasFestivalAmidah = extraMincha.some(x => /^Festival Amidah$/i.test(x));
   if (hasYaalehMincha && !minchaHasFestivalAmidah) minchaElements.push("Yaaleh Veyavo");
@@ -692,14 +710,23 @@ async function calculateDashboard() {
   }
 
   if ((!tachanunMincha || !tachanunToday) && wday !== 7) minchaElements.push("No Tachanun");
+  if (tenDaysToday && wday !== 6 && wday !== 7 && !isErevYomKippurToday) minchaElements.push("Avinu Malkeinu");
 
   if (maarivSeason) maarivElements.push(maarivSeason);
+  if (tenDaysTonight) maarivElements.push("HaMelech HaKadosh");
   if (!shabbatTonight && !yomTovTomorrow) maarivElements.push(rainDew);
   if (yomTovTomorrow) maarivElements.push("Festival Amidah");
   if (hasYaalehMaariv && !yomTovTomorrow) maarivElements.push("Yaaleh Veyavo");
   if (hasAlHanissimMaariv) maarivElements.push("Al HaNissim");
   maarivElements.push(...extraMaar.filter(x => x !== "Festival Amidah"));
+  // In the Ashkenaz rite, Avinu Malkeinu is also recited at Yom Kippur Ma'ariv.
+  if (isYomKippurTonight && !shabbatTonight) maarivElements.push("Avinu Malkeinu");
   if (isLeDavidMaariv) maarivElements.push("Le'David");
+
+  // Musaf uses an Amidah too, so HaMelech HaKadosh applies whenever Musaf
+  // exists during the Ten Days of Repentance. Avinu Malkeinu is not added
+  // here as a general Musaf item.
+  const musafTenDays = (musafDisplay && tenDaysToday) ? ["HaMelech HaKadosh"] : [];
 
   const tachanunDisplay = !tachanunToday
     ? `No (${tachanunReason})`
@@ -789,7 +816,7 @@ async function calculateDashboard() {
     updated:{date:today,time:`${String(p.hour).padStart(2,"0")}:${String(p.minute).padStart(2,"0")}`,timezone:CONFIG.timezone,epoch:Date.now()},
     location:{name:CONFIG.name,latitude:CONFIG.latitude,longitude:CONFIG.longitude,timezone:CONFIG.timezone,countryCode:CONFIG.countryCode},
     calendar:{hebrew_date:hebrewDate,hebrew_date_current:hebrewDate,hebrew_date_next:tomorrowHebrewDate,parshah:parshahDisplay,is_holiday:isHoliday,holidays:holidaysToday,tachanun:tachanunDisplay,daf_yomi:dafYomi,shabbat_mevarchim:isMevarchim,mevarchim_title:mevarchimTitle,mevarchim_note:mevarchimNote,molad:moladInfo},
-    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason].filter(Boolean) : [],mincha:minchaElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
+    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason,...musafTenDays].filter(Boolean) : [],mincha:minchaElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
     candle_lighting:candleLighting,
     zmanim:{ordered:zmanim,by_key:Object.fromEntries(zmanim.map(z=>[z.key,z.time]))},
     upcoming_events:upcomingEvents,
