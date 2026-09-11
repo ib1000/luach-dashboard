@@ -291,7 +291,7 @@ async function calculateDashboard() {
     if (String(item?.category || "") !== "holiday") return false;
     const title = String(item?.title || "");
     if (/Chol HaMoed|Erev|Rosh Hashana LaBehemot/i.test(title)) return false;
-    return /^(?:Rosh Hashana|Yom Kippur|Pesach (?:I|II|VII|VIII)|Shavuot (?:I|II)|Sukkot (?:I|II)|Shemini Atzeret|Simchat Torah)(?:$|:)/i.test(title);
+    return /^(?:Rosh Hashana(?:\s+(?:I|II|\d{4}))?|Yom Kippur|Pesach (?:I|II|VII|VIII)|Shavuot (?:I|II)|Sukkot (?:I|II)|Shemini Atzeret|Simchat Torah)(?:$|:)/i.test(title);
   };
   const yomTovToday = items.some(item => isActualYomTov(item, today));
   const yomTovTomorrow = items.some(item => isActualYomTov(item, tomorrow));
