@@ -397,6 +397,15 @@ async function calculateDashboard() {
       holidaysToday.push(title);
       isHoliday = true;
 
+      // Erev Rosh Hashanah: Selichot are said, but Tachanun is omitted
+      // at Shacharit (and at Mincha). Do not treat the Erev event itself
+      // as Rosh Hashanah/Yom Tov.
+      if (/^Erev Rosh Hashana\b/i.test(title)) {
+        tachanunToday = false;
+        tachanunMincha = false;
+        tachanunReason = "Erev Rosh Hashanah";
+      }
+
       if (/Shemini Atzeret/i.test(title)) {
         seasonalPhrase = isIsraelLocation
           ? "Morid HaTal (Shacharit) / Mashiv HaRuach (Musaf)"
@@ -437,6 +446,18 @@ async function calculateDashboard() {
           torahShach.push("Torah: 3 Aliyot (Vaychal - Morning)");
           extraMincha.push("Torah: 3 Aliyot (Vaychal - Afternoon) + Haftarah", "Aneinu (and Avinu Malkeinu)");
         }
+      } else if (/^Rosh Hashana\b/i.test(title) && !/LaBehemot/i.test(title)) {
+        tachanunToday = false; tachanunMincha = false; tachanunReason = "Rosh Hashanah";
+        otherShach.push("Festival Amidah");
+        extraMincha.push("Festival Amidah");
+        torahShach.push("Special Festival Reading");
+        musafDisplay = "Rosh Hashanah";
+      } else if (/^Yom Kippur\b/i.test(title)) {
+        tachanunToday = false; tachanunMincha = false; tachanunReason = "Yom Kippur";
+        otherShach.push("Festival Amidah");
+        extraMincha.push("Festival Amidah");
+        torahShach.push("Special Festival Reading");
+        musafDisplay = "Yom Kippur";
       } else if (/Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Yom Tov / Chol HaMoed";
         if (/Chol HaMoed/i.test(title)) {
@@ -478,8 +499,13 @@ async function calculateDashboard() {
   if (wday === 6) {
     tachanunMincha = false;
   } else if (wday === 7) {
-    tachanunToday = false; tachanunMincha = false; tachanunReason = "Shabbat";
-    torahShach.push("Torah: 7 Aliyot (Weekly Parshah)");
+    tachanunToday = false; tachanunMincha = false;
+    if (!yomTovToday) {
+      tachanunReason = "Shabbat";
+      torahShach.push("Torah: 7 Aliyot (Weekly Parshah)");
+    } else {
+      tachanunReason = "Shabbat / Yom Tov";
+    }
     if (isBeforeShavuot || isBeforeTishaBav) torahShach.push("Av Harachamim");
     extraMincha.push("Torah: 3 Aliyot (Upcoming Parshah)");
 
@@ -492,6 +518,10 @@ async function calculateDashboard() {
       const weekdayYomTovComing = Array.from({length: 6}, (_, i) => addDays(today, i + 1))
         .some(day => items.some(item => isActualYomTov(item, day)));
       extraMaar.push(weekdayYomTovComing ? "No Vi'hi Noam" : "Vi'hi Noam");
+    } else {
+      // When Motzaei Shabbat is also the beginning of Yom Tov, Ma'ariv
+      // uses the Festival Amidah rather than the weekday Amidah.
+      extraMaar.push("Festival Amidah");
     }
 
     musafDisplay = musafDisplay ? `${musafDisplay} + Shabbat` : "Shabbat";
@@ -649,9 +679,10 @@ async function calculateDashboard() {
 
   if (maarivSeason) maarivElements.push(maarivSeason);
   if (!shabbatTonight && !yomTovTomorrow) maarivElements.push(rainDew);
+  if (yomTovTomorrow) maarivElements.push("Festival Amidah");
   if (hasYaalehMaariv) maarivElements.push("Yaaleh Veyavo");
   if (hasAlHanissimMaariv) maarivElements.push("Al HaNissim");
-  maarivElements.push(...extraMaar);
+  maarivElements.push(...extraMaar.filter(x => x !== "Festival Amidah"));
   if (isLeDavidMaariv) maarivElements.push("Le'David");
 
   const tachanunDisplay = !tachanunToday
