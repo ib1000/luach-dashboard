@@ -432,7 +432,7 @@ async function calculateDashboard() {
       } else if (/Purim/i.test(title) && !/Katan/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Purim";
         hasAlHanissimShach = true; hasAlHanissimMincha = true; hasAlHanissimMaariv = true;
-        torahShach.push("Torah: 3 Aliyot (Exodus)");
+        torahShach.push("Torah: 3 Aliyot");
         otherShach.push("Megillah Reading");
         extraMaar.push("Megillah Reading");
       } else if (/Fast|Tzom|Asara|Ta'anit|Tish'?a?\s*B'?av/i.test(title)) {
@@ -440,11 +440,11 @@ async function calculateDashboard() {
           tachanunToday = false; tachanunMincha = false; tachanunReason = "Tisha B'Av";
           otherShach.push("Kinnot Reading");
           torahShach.push("Torah: 3 Aliyot");
-          extraMincha.push("Torah: 3 Aliyot + Haftarah", "Nachem", "Aneinu");
+          extraMincha.push("Torah: 3 Aliyot", "Nachem", "Aneinu");
         } else {
           otherShach.push("Selichot");
-          torahShach.push("Torah: 3 Aliyot (Vaychal - Morning)");
-          extraMincha.push("Torah: 3 Aliyot (Vaychal - Afternoon) + Haftarah", "Aneinu");
+          torahShach.push("Torah: 3 Aliyot");
+          extraMincha.push("Torah: 3 Aliyot", "Aneinu");
         }
       } else if (/^Rosh Hashana\b/i.test(title) && !/LaBehemot/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Rosh Hashanah";
@@ -486,7 +486,7 @@ async function calculateDashboard() {
     tachanunToday = false; tachanunMincha = false; tachanunReason = "Tisha B'Av";
     if (!otherShach.includes("Kinnot Reading")) otherShach.push("Kinnot Reading");
     if (!torahShach.length) torahShach.push("Torah: 3 Aliyot");
-    if (!extraMincha.includes("Nachem")) extraMincha.push("Torah: 3 Aliyot + Haftarah", "Nachem", "Aneinu");
+    if (!extraMincha.includes("Nachem")) extraMincha.push("Torah: 3 Aliyot", "Nachem", "Aneinu");
   }
 
   // Standard weekday Torah reading: Monday and Thursday Shacharit.
@@ -507,7 +507,7 @@ async function calculateDashboard() {
       tachanunReason = "Shabbat / Yom Tov";
     }
     if (isBeforeShavuot || isBeforeTishaBav) torahShach.push("Av Harachamim");
-    extraMincha.push("Torah: 3 Aliyot (Upcoming Parshah)");
+    extraMincha.push("Torah: 3 Aliyot");
 
     // Motzaei Shabbat: when the incoming evening uses the weekday Amidah,
     // show whether Vi'hi Noam is recited immediately after the Amidah entry.
@@ -746,7 +746,7 @@ async function calculateDashboard() {
       if (/^Sim Shalom$/i.test(String(minchaElements[i]))) minchaElements.splice(i, 1);
     }
 
-    const vaychalLabel = "Torah: 3 Aliyot (Vaychal - Afternoon) + Haftarah";
+    const vaychalLabel = "Torah: 3 Aliyot";
     const vaychalIndex = minchaElements.findIndex(x => String(x) === vaychalLabel);
     if (vaychalIndex >= 0) {
       minchaElements.splice(vaychalIndex, 1);
