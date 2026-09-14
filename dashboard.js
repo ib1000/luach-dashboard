@@ -444,7 +444,7 @@ async function calculateDashboard() {
         } else {
           otherShach.push("Selichot");
           torahShach.push("Torah: 3 Aliyot (Vaychal - Morning)");
-          extraMincha.push("Torah: 3 Aliyot (Vaychal - Afternoon) + Haftarah", "Aneinu (and Avinu Malkeinu)");
+          extraMincha.push("Torah: 3 Aliyot (Vaychal - Afternoon) + Haftarah", "Aneinu");
         }
       } else if (/^Rosh Hashana\b/i.test(title) && !/LaBehemot/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Rosh Hashanah";
@@ -586,7 +586,6 @@ async function calculateDashboard() {
 
   if (shachSeason) shachElements.push(shachSeason);
   if (!shabbatToday && !yomTovToday) shachElements.push(rainDew);
-  if (tenDaysToday) shachElements.push("Ha'Melech Ha'Kadosh");
   // Festival Amidah itself already incorporates Ya'aleh Veyavo.
   const shachHasFestivalAmidah = otherShach.some(x => /^Festival Amidah$/i.test(x));
   if (hasYaalehShach && !shachHasFestivalAmidah) shachElements.push("Yaaleh Veyavo");
@@ -639,15 +638,7 @@ async function calculateDashboard() {
     shachElements.unshift("Selichot");
   }
 
-  // Avinu Malkeinu during Aseret Yemei Teshuvah (Ashkenaz): normally
-  // Shacharit and Mincha on non-Shabbat days; omitted on Erev Yom Kippur.
-  // On Yom Kippur it is included in Shacharit and (for this dashboard) Mincha.
-  if (tenDaysToday && wday !== 7 && !isErevYomKippurToday) {
-    shachElements.push("Avinu Malkeinu");
-  }
-
   if (minchaSeason) minchaElements.push(minchaSeason);
-  if (tenDaysToday) minchaElements.push("Ha'Melech Ha'Kadosh");
   if (!shabbatToday && !yomTovToday) minchaElements.push(rainDew);
   const minchaHasFestivalAmidah = extraMincha.some(x => /^Festival Amidah$/i.test(x));
   if (hasYaalehMincha && !minchaHasFestivalAmidah) minchaElements.push("Yaaleh Veyavo");
@@ -713,7 +704,6 @@ async function calculateDashboard() {
   if (tenDaysToday && wday !== 6 && wday !== 7 && !isErevYomKippurToday) minchaElements.push("Avinu Malkeinu");
 
   if (maarivSeason) maarivElements.push(maarivSeason);
-  if (tenDaysTonight) maarivElements.push("Ha'Melech Ha'Kadosh");
   if (!shabbatTonight && !yomTovTomorrow) maarivElements.push(rainDew);
   if (yomTovTomorrow) maarivElements.push("Festival Amidah");
   if (hasYaalehMaariv && !yomTovTomorrow) maarivElements.push("Yaaleh Veyavo");
@@ -723,22 +713,65 @@ async function calculateDashboard() {
   if (isYomKippurTonight && !shabbatTonight) maarivElements.push("Avinu Malkeinu");
   if (isLeDavidMaariv) maarivElements.push("Le'David");
 
-  // When a Festival Amidah is shown, place the Ten Days modification immediately after it.
-  const placeHaMelechAfterFestivalAmidah = (elements) => {
+  // Final Ten Days ordering. On weekday Amidah services, Ha'Melech Ha'Kadosh
+  // is placed immediately before the seasonal insertion: before Morid HaTal
+  // in Israel, otherwise before V'ten Berachah / V'ten Tal U'Matar.
+  // Festival services retain the previously requested Festival Amidah ->
+  // Ha'Melech Ha'Kadosh adjacency because the weekday seasonal insertion is absent.
+  const placeHaMelechForService = (elements, tenDays, isIsrael) => {
     const label = "Ha'Melech Ha'Kadosh";
-    // Remove any earlier occurrence first, because that can change the index
-    // of Festival Amidah. Then locate Festival Amidah again and insert the
-    // phrase directly after it, guaranteeing adjacency.
     for (let i = elements.length - 1; i >= 0; i--) {
       if (elements[i] === label) elements.splice(i, 1);
     }
-    const festivalIndex = elements.findIndex(x => /^Festival Amidah$/i.test(x));
-    if (festivalIndex < 0) return;
-    elements.splice(festivalIndex + 1, 0, label);
+    if (!tenDays) return;
+    let targetIndex = -1;
+    if (isIsrael) {
+      targetIndex = elements.findIndex(x => /Morid HaTal/i.test(String(x)));
+    } else {
+      targetIndex = elements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
+    }
+    if (targetIndex >= 0) {
+      elements.splice(targetIndex, 0, label);
+      return;
+    }
+    const festivalIndex = elements.findIndex(x => /^Festival Amidah$/i.test(String(x)));
+    if (festivalIndex >= 0) elements.splice(festivalIndex + 1, 0, label);
+    else elements.unshift(label);
   };
-  placeHaMelechAfterFestivalAmidah(shachElements);
-  placeHaMelechAfterFestivalAmidah(minchaElements);
-  placeHaMelechAfterFestivalAmidah(maarivElements);
+
+  // Fast-day Mincha on a weekday: Torah reading first, then Aneinu, then Sim Shalom.
+  if (wday !== 7) {
+    for (let i = minchaElements.length - 1; i >= 0; i--) {
+      if (/^Aneinu \(and Avinu Malkeinu\)$/i.test(String(minchaElements[i]))) minchaElements[i] = "Aneinu";
+      if (/^Sim Shalom$/i.test(String(minchaElements[i]))) minchaElements.splice(i, 1);
+    }
+
+    const vaychalLabel = "Torah: 3 Aliyot (Vaychal - Afternoon) + Haftarah";
+    const vaychalIndex = minchaElements.findIndex(x => String(x) === vaychalLabel);
+    if (vaychalIndex >= 0) {
+      minchaElements.splice(vaychalIndex, 1);
+      minchaElements.unshift(vaychalLabel);
+    }
+
+    const aneinuIndex = minchaElements.findIndex(x => /^Aneinu$/i.test(String(x)));
+    if (aneinuIndex >= 0) minchaElements.splice(aneinuIndex + 1, 0, "Sim Shalom");
+  }
+
+  // Weekday Shacharit: when Avinu Malkeinu is said, place it immediately
+  // after V'ten Berachah / V'ten Tal U'Matar.
+  const shachAvinuMalkeinu = tenDaysToday && wday !== 7 && !isErevYomKippurToday;
+  if (shachAvinuMalkeinu) {
+    for (let i = shachElements.length - 1; i >= 0; i--) {
+      if (/^Avinu Malkeinu$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
+    }
+    const vtenIndex = shachElements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
+    if (vtenIndex >= 0) shachElements.splice(vtenIndex + 1, 0, "Avinu Malkeinu");
+    else shachElements.push("Avinu Malkeinu");
+  }
+
+  placeHaMelechForService(shachElements, tenDaysToday, isIsraelLocation);
+  placeHaMelechForService(minchaElements, tenDaysToday, isIsraelLocation);
+  placeHaMelechForService(maarivElements, tenDaysTonight, isIsraelLocation);
 
   // Musaf uses an Amidah too, so Ha'Melech Ha'Kadosh applies whenever Musaf
   // exists during the Ten Days of Repentance. Avinu Malkeinu is not added
