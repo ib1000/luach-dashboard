@@ -773,6 +773,39 @@ async function calculateDashboard() {
   placeHaMelechForService(minchaElements, tenDaysToday, isIsraelLocation);
   placeHaMelechForService(maarivElements, tenDaysTonight, isIsraelLocation);
 
+  // Normalize all Tachanun omission wording.
+  for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
+    for (let i = 0; i < serviceElements.length; i++) {
+      if (/^No Tachanun$/i.test(String(serviceElements[i]))) serviceElements[i] = "Omit: Tachanun";
+    }
+  }
+
+  // Erev Yom Kippur Shacharit ordering (9 Tishrei).
+  // 1) Omit Mizmor Le'Todah is the very first item.
+  // 2) Omit: Tachanun immediately follows V'ten Berachah / V'ten Tal U'Matar.
+  // 3) Omit La'menazeiach immediately precedes Le'David.
+  if (isErevYomKippurToday) {
+    const removeMatching = (re) => {
+      for (let i = shachElements.length - 1; i >= 0; i--) {
+        if (re.test(String(shachElements[i]))) shachElements.splice(i, 1);
+      }
+    };
+
+    removeMatching(/^Omit: Mizmor Le'Todah$/i);
+    removeMatching(/^Omit: Tachanun$/i);
+    removeMatching(/^Omit: La'menazeiach$/i);
+
+    shachElements.unshift("Omit: Mizmor Le'Todah");
+
+    const vtenIndex = shachElements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
+    if (vtenIndex >= 0) shachElements.splice(vtenIndex + 1, 0, "Omit: Tachanun");
+    else shachElements.push("Omit: Tachanun");
+
+    const leDavidIndex = shachElements.findIndex(x => /^Le'David$/i.test(String(x)));
+    if (leDavidIndex >= 0) shachElements.splice(leDavidIndex, 0, "Omit: La'menazeiach");
+    else shachElements.push("Omit: La'menazeiach");
+  }
+
   // Musaf uses an Amidah too, so Ha'Melech Ha'Kadosh applies whenever Musaf
   // exists during the Ten Days of Repentance. Avinu Malkeinu is not added
   // here as a general Musaf item.
