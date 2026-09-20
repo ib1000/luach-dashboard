@@ -782,8 +782,9 @@ async function calculateDashboard() {
 
   // Erev Yom Kippur Shacharit ordering (9 Tishrei).
   // 1) Omit Mizmor Le'Todah is the very first item.
-  // 2) Omit: Tachanun immediately follows V'ten Berachah / V'ten Tal U'Matar.
-  // 3) Omit La'menazeiach immediately precedes Le'David.
+  // 2) Al Cheit immediately follows V'ten Berachah / V'ten Tal U'Matar.
+  // 3) Omit: Tachanun immediately follows Al Cheit.
+  // 4) Omit La'menazeiach immediately precedes Le'David.
   if (isErevYomKippurToday) {
     const removeMatching = (re) => {
       for (let i = shachElements.length - 1; i >= 0; i--) {
@@ -794,17 +795,44 @@ async function calculateDashboard() {
     removeMatching(/^Omit: Mizmor Le'Todah$/i);
     removeMatching(/^Omit: Tachanun$/i);
     removeMatching(/^Omit: La'menazeiach$/i);
+    removeMatching(/^Al Cheit$/i);
 
     shachElements.unshift("Omit: Mizmor Le'Todah");
 
     const vtenIndex = shachElements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
-    if (vtenIndex >= 0) shachElements.splice(vtenIndex + 1, 0, "Omit: Tachanun");
-    else shachElements.push("Omit: Tachanun");
+    if (vtenIndex >= 0) shachElements.splice(vtenIndex + 1, 0, "Al Cheit", "Omit: Tachanun");
+    else shachElements.push("Al Cheit", "Omit: Tachanun");
 
     const leDavidIndex = shachElements.findIndex(x => /^Le'David$/i.test(String(x)));
     if (leDavidIndex >= 0) shachElements.splice(leDavidIndex, 0, "Omit: La'menazeiach");
     else shachElements.push("Omit: La'menazeiach");
   }
+
+  // Erev Yom Kippur Mincha ordering (9 Tishrei): Al Cheit belongs
+  // between V'ten Berachah / V'ten Tal U'Matar and Omit: Tachanun.
+  if (isErevYomKippurToday) {
+    for (let i = minchaElements.length - 1; i >= 0; i--) {
+      if (/^Al Cheit$/i.test(String(minchaElements[i]))) minchaElements.splice(i, 1);
+      if (/^Omit: Tachanun$/i.test(String(minchaElements[i]))) minchaElements.splice(i, 1);
+    }
+    const minchaVtenIndex = minchaElements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
+    if (minchaVtenIndex >= 0) minchaElements.splice(minchaVtenIndex + 1, 0, "Al Cheit", "Omit: Tachanun");
+    else minchaElements.push("Al Cheit", "Omit: Tachanun");
+  }
+
+  // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
+  if (isYomKippurToday) {
+    for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
+      for (let i = serviceElements.length - 1; i >= 0; i--) {
+        if (/^Omit: Tachanun$/i.test(String(serviceElements[i]))) serviceElements.splice(i, 1);
+      }
+    }
+  }
+
+  // Neilah is shown as its own service on Yom Kippur, immediately after Mincha.
+  const neilahElements = isYomKippurToday
+    ? ["Ha'Melech Ha'Kadosh", "Ve'chotmainu", "Avinu Malkeinu"]
+    : [];
 
   // Musaf uses an Amidah too, so Ha'Melech Ha'Kadosh applies whenever Musaf
   // exists during the Ten Days of Repentance. Avinu Malkeinu is not added
@@ -899,7 +927,7 @@ async function calculateDashboard() {
     updated:{date:today,time:`${String(p.hour).padStart(2,"0")}:${String(p.minute).padStart(2,"0")}`,timezone:CONFIG.timezone,epoch:Date.now()},
     location:{name:CONFIG.name,latitude:CONFIG.latitude,longitude:CONFIG.longitude,timezone:CONFIG.timezone,countryCode:CONFIG.countryCode},
     calendar:{hebrew_date:hebrewDate,hebrew_date_current:hebrewDate,hebrew_date_next:tomorrowHebrewDate,parshah:parshahDisplay,is_holiday:isHoliday,holidays:holidaysToday,tachanun:tachanunDisplay,daf_yomi:dafYomi,shabbat_mevarchim:isMevarchim,mevarchim_title:mevarchimTitle,mevarchim_note:mevarchimNote,molad:moladInfo},
-    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason,...musafTenDays].filter(Boolean) : [],mincha:minchaElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
+    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason,...musafTenDays].filter(Boolean) : [],mincha:minchaElements,neilah:neilahElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
     candle_lighting:candleLighting,
     zmanim:{ordered:zmanim,by_key:Object.fromEntries(zmanim.map(z=>[z.key,z.time]))},
     upcoming_events:upcomingEvents,
@@ -926,7 +954,7 @@ function renderFacts(calendar) {
 function renderTefillah(t) {
   $("nusach-label").textContent = t.nusach ? `Nusach ${t.nusach}` : "";
   const grid = $("tefillah-grid"); grid.replaceChildren();
-  for (const [name,items] of [["Shacharit",t.shacharit],["Musaf",t.musaf],["Mincha",t.mincha],["Kabbalat Shabbat",t.kabbalat_shabbat],["Ma'ariv",t.maariv]]) {
+  for (const [name,items] of [["Shacharit",t.shacharit],["Musaf",t.musaf],["Mincha",t.mincha],["Neilah",t.neilah],["Kabbalat Shabbat",t.kabbalat_shabbat],["Ma'ariv",t.maariv]]) {
     if (!items?.length) continue;
     const card = document.createElement("article"); card.className="tefillah-card";
     const h3 = document.createElement("h3"); h3.textContent=name;
