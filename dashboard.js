@@ -781,10 +781,11 @@ async function calculateDashboard() {
   }
 
   // Erev Yom Kippur Shacharit ordering (9 Tishrei).
-  // 1) Omit Mizmor Le'Todah is the very first item.
-  // 2) Al Cheit immediately follows V'ten Berachah / V'ten Tal U'Matar.
-  // 3) Omit: Tachanun immediately follows Al Cheit.
-  // 4) Omit La'menazeiach immediately precedes Le'David.
+  // 1) Selichot is the very first item.
+  // 2) Omit Mizmor Le'Todah follows Selichot.
+  // 3) Al Cheit is not displayed in Shacharit.
+  // 4) Omit: Tachanun immediately follows V'ten Berachah / V'ten Tal U'Matar.
+  // 5) Omit La'menazeiach immediately precedes Le'David.
   if (isErevYomKippurToday) {
     const removeMatching = (re) => {
       for (let i = shachElements.length - 1; i >= 0; i--) {
@@ -792,16 +793,17 @@ async function calculateDashboard() {
       }
     };
 
+    removeMatching(/^Selichot$/i);
     removeMatching(/^Omit: Mizmor Le'Todah$/i);
     removeMatching(/^Omit: Tachanun$/i);
     removeMatching(/^Omit: La'menazeiach$/i);
     removeMatching(/^Al Cheit$/i);
 
-    shachElements.unshift("Omit: Mizmor Le'Todah");
+    shachElements.unshift("Selichot", "Omit: Mizmor Le'Todah");
 
     const vtenIndex = shachElements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
-    if (vtenIndex >= 0) shachElements.splice(vtenIndex + 1, 0, "Al Cheit", "Omit: Tachanun");
-    else shachElements.push("Al Cheit", "Omit: Tachanun");
+    if (vtenIndex >= 0) shachElements.splice(vtenIndex + 1, 0, "Omit: Tachanun");
+    else shachElements.push("Omit: Tachanun");
 
     const leDavidIndex = shachElements.findIndex(x => /^Le'David$/i.test(String(x)));
     if (leDavidIndex >= 0) shachElements.splice(leDavidIndex, 0, "Omit: La'menazeiach");
