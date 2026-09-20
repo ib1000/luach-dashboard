@@ -838,6 +838,16 @@ async function calculateDashboard() {
     }
   }
 
+  // Yom Kippur Mincha begins with the Torah reading and Maftir Yonah.
+  if (isYomKippurToday) {
+    for (let i = minchaElements.length - 1; i >= 0; i--) {
+      if (/^(?:Torah reading \(3 aliyot\)|Maftir Yonah)$/i.test(String(minchaElements[i]))) {
+        minchaElements.splice(i, 1);
+      }
+    }
+    minchaElements.unshift("Torah Reading (3 aliyot)", "Maftir Yonah");
+  }
+
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
   if (isYomKippurToday) {
     for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
