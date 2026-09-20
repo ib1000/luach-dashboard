@@ -822,6 +822,22 @@ async function calculateDashboard() {
     else minchaElements.push("Al Cheit", "Omit: Tachanun");
   }
 
+  // Ma'ariv after Yom Kippur / Neilah: Atah Chonantanu is shown
+  // immediately before V'ten Berachah / V'ten Tal U'Matar.
+  if (isYomKippurToday) {
+    for (let i = maarivElements.length - 1; i >= 0; i--) {
+      if (/^Atah Chonantanu$/i.test(String(maarivElements[i]))) maarivElements.splice(i, 1);
+    }
+    const yomKippurMaarivVtenIndex = maarivElements.findIndex(x =>
+      /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x))
+    );
+    if (yomKippurMaarivVtenIndex >= 0) {
+      maarivElements.splice(yomKippurMaarivVtenIndex, 0, "Atah Chonantanu");
+    } else {
+      maarivElements.push("Atah Chonantanu");
+    }
+  }
+
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
   if (isYomKippurToday) {
     for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
@@ -963,7 +979,8 @@ function renderTefillah(t) {
     const tags = document.createElement("div"); tags.className="tag-list";
     for (const value of items) {
       const span=document.createElement("span");
-      span.className="tag";
+      const isOmit = /^Omit(?:\s|:)/i.test(String(value));
+      span.className = isOmit ? "tag tefillah-omit" : "tag tefillah-standard";
       span.textContent=value; tags.append(span);
     }
     card.append(h3,tags); grid.append(card);
