@@ -567,6 +567,23 @@ async function calculateDashboard() {
   const isYomKippurToday = /Tishrei/i.test(hMonth) && hDay === 10;
   const isYomKippurTonight = /Tishrei/i.test(String(tomorrowHebrew.month || "")) && Number(tomorrowHebrew.day || 0) === 10;
 
+  // Tachanun is omitted from Erev Yom Kippur through the day after
+  // Simchat Torah on ordinary weekdays.  The end date is location-aware:
+  // 23 Tishrei in Israel and 24 Tishrei in the Diaspora.  Do not create
+  // an omission notice on Shabbat or on an actual Festival/Yom Tov day.
+  const postYomKippurTachanunEnd = isIsraelLocation ? 23 : 24;
+  const isTachanunOmissionSeason =
+    /Tishrei/i.test(hMonth) &&
+    hDay >= 9 &&
+    hDay <= postYomKippurTachanunEnd &&
+    !shabbatToday &&
+    !yomTovToday;
+  if (isTachanunOmissionSeason) {
+    tachanunToday = false;
+    tachanunMincha = false;
+    tachanunReason = "Erev Yom Kippur through after Simchat Torah";
+  }
+
   let isIsraelRain = false, isDiaspRain = false;
   if (/Kislev|Tevet|Shevat|Adar/i.test(hMonth)) isIsraelRain = true;
   else if (/Cheshvan/i.test(hMonth) && hDay >= 7) isIsraelRain = true;
