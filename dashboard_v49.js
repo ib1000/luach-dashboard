@@ -1006,12 +1006,8 @@ function renderTefillah(t) {
     const tags = document.createElement("div"); tags.className="tag-list";
     for (const value of items) {
       const span=document.createElement("span");
-      const textValue = String(value);
-      const isOmit = /^Omit(?:\s|:)/i.test(textValue);
-      const isTorahOrMaftir = /^(?:Torah(?:\s|:)|Maftir(?:\s|:))/i.test(textValue);
-      span.className = isOmit
-        ? "tag tefillah-omit"
-        : (isTorahOrMaftir ? "tag tefillah-torah" : "tag tefillah-standard");
+      const isOmit = /^Omit(?:\s|:)/i.test(String(value));
+      span.className = isOmit ? "tag tefillah-omit" : "tag tefillah-standard";
       span.textContent=value; tags.append(span);
     }
     card.append(h3,tags); grid.append(card);
