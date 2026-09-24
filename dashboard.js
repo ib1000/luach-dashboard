@@ -567,6 +567,16 @@ async function calculateDashboard() {
   const isYomKippurToday = /Tishrei/i.test(hMonth) && hDay === 10;
   const isYomKippurTonight = /Tishrei/i.test(String(tomorrowHebrew.month || "")) && Number(tomorrowHebrew.day || 0) === 10;
 
+  // End-of-Torah-cycle display in TODAY. Hebcal's next regular parashat event
+  // skips Simchat Torah, but during this period we want to show the special
+  // Simchat Torah reading until the cycle restarts with Bereshit.
+  const simchatTorahDay = isIsraelLocation ? 22 : 23;
+  if (/Tishrei/i.test(hMonth) && hDay >= 11 && hDay < simchatTorahDay) {
+    parshahDisplay = "Ve'zot Ha'Berachah";
+  } else if (/Tishrei/i.test(hMonth) && hDay === simchatTorahDay) {
+    parshahDisplay = "Ve'zot He'Berachah / Bereshit";
+  }
+
   // Tachanun is omitted from Erev Yom Kippur through the day after
   // Simchat Torah on ordinary weekdays.  The end date is location-aware:
   // 23 Tishrei in Israel and 24 Tishrei in the Diaspora.  Do not create
