@@ -355,7 +355,7 @@ async function calculateDashboard() {
       }
     }
 
-    if (category === "hebrewDate" && itemDay === today) {
+    if (/^(?:hebrewDate|hebdate)$/i.test(category) && itemDay === today) {
       if (/Cheshvan|Kislev|Tevet|Shvat|Adar/i.test(title)) {
         seasonalPhrase = "Mashiv HaRuach U'Morid HaGeshem";
       }
@@ -383,10 +383,12 @@ async function calculateDashboard() {
 
     if (itemDay !== today) continue;
 
-    if (item.hdate) hebrewDate = item.hdate;
-
-    if (category === "hebrewDate") {
-      hebrewDate = title;
+    // Daytime Shacharit/Mincha/Musaf must use the Hebrew date belonging
+    // to this civil day. Do not copy item.hdate from arbitrary events:
+    // evening/candle events can describe the Hebrew date that begins
+    // after sunset and would incorrectly advance daytime services.
+    if (/^(?:hebrewDate|hebdate)$/i.test(category)) {
+      hebrewDate = String(item.hdate || item.title_orig || title);
     } else if (category === "dafyomi") {
       dafYomi = title;
     } else if (/Erev Tish'?a?\s*B'?av/i.test(title)) {
@@ -414,7 +416,7 @@ async function calculateDashboard() {
         seasonalPhrase = isIsraelLocation
           ? "Mashiv HaRuach (Shacharit) / Morid HaTal (Musaf)"
           : "Mashiv HaRuach (Shacharit) / ";
-      } else if (/Pesach|Shavuot|Sukkot/i.test(title) && !/Sukkot Ch/i.test(title)) {
+      } else if (!/^Erev\b/i.test(title) && /Pesach|Shavuot|Sukkot/i.test(title) && !/Sukkot Ch/i.test(title)) {
         seasonalPhrase = isIsraelLocation ? "Morid HaTal" : "";
       }
 
@@ -450,15 +452,15 @@ async function calculateDashboard() {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Rosh Hashanah";
         otherShach.push("Festival Amidah");
         extraMincha.push("Festival Amidah");
-        torahShach.push("Special Festival Reading");
+        torahShach.push("Torah: Special Festival Reading");
         musafDisplay = "Rosh Hashanah";
       } else if (/^Yom Kippur\b/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Yom Kippur";
         otherShach.push("Festival Amidah");
         extraMincha.push("Festival Amidah");
-        torahShach.push("Special Festival Reading");
+        torahShach.push("Torah: Special Festival Reading");
         musafDisplay = "Yom Kippur";
-      } else if (/Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)) {
+      } else if (!/^Erev\b/i.test(title) && /Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Yom Tov / Chol HaMoed";
         if (/Chol HaMoed/i.test(title)) {
           hasYaalehShach = true; hasYaalehMincha = true;
@@ -468,7 +470,7 @@ async function calculateDashboard() {
         }
         const hallelType = /Pesach I|Pesach II|Sukkot|Shemini|Simchat/i.test(title) ? "Full Hallel" : "Half Hallel";
         hallelShach.push(hallelType);
-        torahShach.push("Special Festival Reading");
+        torahShach.push("Torah: Special Festival Reading");
         musafDisplay = "Festival";
       }
     }
@@ -873,6 +875,18 @@ async function calculateDashboard() {
       }
     }
     minchaElements.unshift("Torah Reading (3 aliyot)", "Maftir Yonah");
+  }
+
+
+  // In Shacharit, Full Hallel must immediately follow Festival Amidah.
+  {
+    const festivalIndex = shachElements.findIndex(x => /^Festival Amidah$/i.test(String(x)));
+    const hallelIndex = shachElements.findIndex(x => /^Full Hallel$/i.test(String(x)));
+    if (festivalIndex >= 0 && hallelIndex >= 0) {
+      shachElements.splice(hallelIndex, 1);
+      const newFestivalIndex = shachElements.findIndex(x => /^Festival Amidah$/i.test(String(x)));
+      shachElements.splice(newFestivalIndex + 1, 0, "Full Hallel");
+    }
   }
 
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
