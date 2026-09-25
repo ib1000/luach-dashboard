@@ -762,7 +762,7 @@ async function calculateDashboard() {
     const tzidkatechahOmitted = yomTovToday || holidaysToday.some(title =>
       /Rosh Chodesh|Chanukah|Purim|Rosh Hashana|Yom Kippur|Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)
     );
-    if (tzidkatechahOmitted) minchaElements.push("Omit: Tzidkatechah");
+    if (tzidkatechahOmitted) minchaElements.push("Omit Tzidkatechah");
   }
 
   if ((!tachanunMincha || !tachanunToday) && wday !== 7) minchaElements.push("No Tachanun");
