@@ -925,6 +925,23 @@ async function calculateDashboard() {
     }
   }
 
+  // When a Festival Amidah coincides with Shabbat, make the Shabbat component explicit.
+  // Friday-night Ma'ariv belongs to Shabbat; Saturday Shacharit and Mincha are Shabbat services.
+  const markFestivalAmidahForShabbat = (elements) => {
+    for (let i = 0; i < elements.length; i++) {
+      if (/^Festival Amidah$/i.test(String(elements[i]))) {
+        elements[i] = "Festival Amidah + Shabbat";
+      }
+    }
+  };
+  if (shabbatToday) {
+    markFestivalAmidahForShabbat(shachElements);
+    markFestivalAmidahForShabbat(minchaElements);
+  }
+  if (shabbatTonight) {
+    markFestivalAmidahForShabbat(maarivElements);
+  }
+
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
   if (isYomKippurToday) {
     for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
