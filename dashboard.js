@@ -975,6 +975,20 @@ async function calculateDashboard() {
     markFestivalAmidahForShabbat(maarivElements);
   }
 
+  // On weekday Chol HaMoed Shacharit, Omit: La'menazeiach follows
+  // Torah: Special Festival Reading immediately.
+  if (cholHaMoedToday && !shabbatToday) {
+    for (let i = shachElements.length - 1; i >= 0; i--) {
+      if (/^Omit: La'menazeiach$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
+    }
+    const specialFestivalTorahIndex = shachElements.findIndex(x =>
+      /^Torah: Special Festival Reading$/i.test(String(x))
+    );
+    if (specialFestivalTorahIndex >= 0) {
+      shachElements.splice(specialFestivalTorahIndex + 1, 0, "Omit: La'menazeiach");
+    }
+  }
+
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
   if (isYomKippurToday) {
     for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
@@ -1068,7 +1082,7 @@ async function calculateDashboard() {
     return { key, label:labels[key], time:hhmmFromIso(iso), iso };
   });
 
-  const upcomingEvents = items
+  const upcomingEventCandidates = items
     .filter(item => {
       const title = String(item.title || "").trim();
       return (item.category === "holiday" || item.category === "roshchodesh")
@@ -1078,9 +1092,29 @@ async function calculateDashboard() {
     })
     .map(item => {
       const iso = String(item.date || "").slice(0,10);
-      return { title:item.title, category:item.category, date:iso, text_date:humanDate(iso, {weekday:"short"}) };
-    })
-    .slice(0, 10);
+      return { title:String(item.title || ""), category:item.category, date:iso, text_date:humanDate(iso, {weekday:"short"}) };
+    });
+
+  // When Rosh Chodesh spans two consecutive days, make the two days explicit
+  // as Rosh Chodesh I <month> and Rosh Chodesh II <month>.
+  for (let i = 0; i < upcomingEventCandidates.length; i++) {
+    const current = upcomingEventCandidates[i];
+    if (!/^Rosh Chodesh\s+/i.test(current.title)) continue;
+    const month = current.title.replace(/^Rosh Chodesh\s+/i, "").trim();
+    const next = upcomingEventCandidates[i + 1];
+    if (!next || next.category !== current.category) continue;
+    const nextMonth = String(next.title || "").replace(/^Rosh Chodesh\s+/i, "").trim();
+    const d1 = new Date(`${current.date}T00:00:00Z`);
+    const d2 = new Date(`${next.date}T00:00:00Z`);
+    const consecutive = (d2 - d1) === 86400000;
+    if (consecutive && /^Rosh Chodesh\s+/i.test(next.title) && nextMonth === month) {
+      current.title = `Rosh Chodesh I ${month}`;
+      next.title = `Rosh Chodesh II ${month}`;
+      i++;
+    }
+  }
+
+  const upcomingEvents = upcomingEventCandidates.slice(0, 10);
 
   const mevarchimNote = (isMevarchim || moladInfo)
     ? `Shabbat Mevarchim (${mevarchimTitle || "Blessing of the New Month"}) occurs ${wday === 6 ? "tomorrow" : "today"}`
@@ -1101,8 +1135,8 @@ async function calculateDashboard() {
 function renderFacts(calendar) {
   const rows = [
     ["Parshah", calendar.parshah],
-    ["Holiday", calendar.is_holiday ? (calendar.holidays?.join(", ") || "Yes") : "No"],
     ["Daf Yomi", calendar.daf_yomi],
+    ["Holiday", calendar.is_holiday ? (calendar.holidays?.join(", ") || "Yes") : "No"],
   ];
   const dl = $("today-facts"); dl.replaceChildren();
   for (const [k,v] of rows) {
