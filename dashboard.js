@@ -438,8 +438,11 @@ async function calculateDashboard() {
       holidaysToday.push(title);
       isHoliday = true;
     } else if (category === "holiday" || category === "roshchodesh") {
-      holidaysToday.push(title);
-      isHoliday = true;
+      // Sigd is intentionally omitted from the TODAY Holiday display.
+      if (!/^Sigd(?:\s|$)/i.test(title)) {
+        holidaysToday.push(title);
+        isHoliday = true;
+      }
 
       // Erev Rosh Hashanah: Selichot are said, but Tachanun is omitted
       // at Shacharit (and at Mincha). Do not treat the Erev event itself
@@ -1088,7 +1091,8 @@ async function calculateDashboard() {
       return (item.category === "holiday" || item.category === "roshchodesh")
         && String(item.date || "").slice(0,10) > today
         && !/Mevarchim|Molad/i.test(title)
-        && !/^Erev\b/i.test(title);
+        && !/^Erev\b/i.test(title)
+        && !/^Sigd(?:\s|$)/i.test(title);
     })
     .map(item => {
       const iso = String(item.date || "").slice(0,10);
