@@ -210,7 +210,7 @@ function usesShortenedKabbalatShabbat(title, category = "") {
   const c = String(category || "").toLowerCase();
   if (c !== "holiday") return false;
   if (/Rosh Hashana LaBehemot/i.test(t)) return false;
-  return /Chol HaMoed|^Pesach(?:\s|$)|^Shavuot(?:\s|$)|^Sukkot(?:\s|$)|^Shemini Atzeret(?:\s|$)|^Simchat Torah(?:\s|$)|^Rosh Hashana(?:\s|$)|^Yom Kippur(?:\s|$)/i.test(t);
+  return isCholHaMoedTitle(t) || /^Pesach(?:\s|$)|^Shavuot(?:\s|$)|^Sukkot(?:\s|$)|^Shemini Atzeret(?:\s|$)|^Simchat Torah(?:\s|$)|^Rosh Hashana(?:\s|$)|^Yom Kippur(?:\s|$)/i.test(t);
 }
 
 function formatTime(dateOrIso, { seconds = false } = {}) {
@@ -315,6 +315,8 @@ async function calculateDashboard() {
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
   if (nextParshaItem?.title) parshahDisplay = String(nextParshaItem.title).replace(/^Parashat\s+/i, "");
 
+  const isCholHaMoedTitle = (title) => /Chol HaMoed/i.test(String(title || "")) || /\(CH[’‘'"]{0,2}M\)/i.test(String(title || ""));
+
   // A service uses the weekday Amidah rain/dew blessing only on a weekday.
   // Keep Chol HaMoed as weekday for this purpose; suppress the blessing only
   // on Shabbat or an actual Yom Tov.
@@ -322,11 +324,19 @@ async function calculateDashboard() {
     if (String(item?.date || "").slice(0, 10) !== day) return false;
     if (String(item?.category || "") !== "holiday") return false;
     const title = String(item?.title || "");
-    if (/Chol HaMoed|Erev|Rosh Hashana LaBehemot/i.test(title)) return false;
+    if (isCholHaMoedTitle(title) || /Erev|Rosh Hashana LaBehemot/i.test(title)) return false;
     return /^(?:Rosh Hashana(?:\s+(?:I|II|\d{4}))?|Yom Kippur|Pesach (?:I|II|VII|VIII)|Shavuot (?:I|II)|Sukkot (?:I|II)|Shemini Atzeret|Simchat Torah)(?:$|:)/i.test(title);
   };
   const yomTovToday = items.some(item => isActualYomTov(item, today));
   const yomTovTomorrow = items.some(item => isActualYomTov(item, tomorrow));
+  const cholHaMoedToday = items.some(item =>
+    String(item?.date || "").slice(0, 10) === today &&
+    isCholHaMoedTitle(String(item?.title || ""))
+  );
+  const cholHaMoedTomorrow = items.some(item =>
+    String(item?.date || "").slice(0, 10) === tomorrow &&
+    isCholHaMoedTitle(String(item?.title || ""))
+  );
   const shabbatToday = wday === 7;
   const shabbatTonight = wday === 6; // Friday-night Ma'ariv belongs to Shabbat.
 
@@ -406,7 +416,7 @@ async function calculateDashboard() {
         (category === "roshchodesh" || category === "holiday") &&
         /^Rosh Chodesh(?:\s|$)/i.test(title);
       const isTomorrowActualYomTov = isActualYomTov(item, tomorrow);
-      if (isTomorrowRoshChodesh || isTomorrowActualYomTov) {
+      if (isTomorrowRoshChodesh || isTomorrowActualYomTov || isCholHaMoedTitle(title)) {
         hasYaalehMaariv = true;
       } else if (/^(?:Chanukah|Purim)(?:\s|$)/i.test(title)) {
         hasAlHanissimMaariv = true;
@@ -494,7 +504,7 @@ async function calculateDashboard() {
         musafDisplay = "Yom Kippur";
       } else if (!/^Erev\b/i.test(title) && /Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Yom Tov / Chol HaMoed";
-        if (/Chol HaMoed/i.test(title)) {
+        if (isCholHaMoedTitle(title)) {
           hasYaalehShach = true; hasYaalehMincha = true;
         } else {
           otherShach.push("Festival Amidah");
@@ -653,10 +663,10 @@ async function calculateDashboard() {
   if (!shabbatToday && !yomTovToday) shachElements.push(rainDew);
   // Festival Amidah itself already incorporates Ya'aleh Veyavo.
   const shachHasFestivalAmidah = otherShach.some(x => /^Festival Amidah$/i.test(x));
-  if (hasYaalehShach && !shachHasFestivalAmidah) shachElements.push("Yaaleh Veyavo");
+  if (hasYaalehShach && !shachHasFestivalAmidah) shachElements.push("Ya'aleh Veyavo");
   if (hasAlHanissimShach) shachElements.push("Al HaNissim");
   shachElements.push(...hallelShach, ...otherShach);
-  if (!tachanunToday && wday !== 7) shachElements.push("No Tachanun");
+  if (!tachanunToday && wday !== 7 && !yomTovToday) shachElements.push("No Tachanun");
   shachElements.push(...torahShach);
 
   // Psalm 27 (Le'David): from Rosh Chodesh Elul through Shemini Atzeret.
@@ -706,7 +716,7 @@ async function calculateDashboard() {
   if (minchaSeason) minchaElements.push(minchaSeason);
   if (!shabbatToday && !yomTovToday) minchaElements.push(rainDew);
   const minchaHasFestivalAmidah = extraMincha.some(x => /^Festival Amidah$/i.test(x));
-  if (hasYaalehMincha && !minchaHasFestivalAmidah) minchaElements.push("Yaaleh Veyavo");
+  if (hasYaalehMincha && !minchaHasFestivalAmidah) minchaElements.push("Ya'aleh Veyavo");
   if (hasAlHanissimMincha) minchaElements.push("Al HaNissim");
   if (wday === 7 && minchaHasFestivalAmidah) {
     // On Shabbat/Yom Tov, show the Shabbat-afternoon Torah reading before the Festival Amidah.
@@ -765,18 +775,41 @@ async function calculateDashboard() {
     if (tzidkatechahOmitted) minchaElements.push("Omit: Tzidkatechah");
   }
 
-  if ((!tachanunMincha || !tachanunToday) && wday !== 7) minchaElements.push("No Tachanun");
+  if ((!tachanunMincha || !tachanunToday) && wday !== 7 && !yomTovToday) minchaElements.push("No Tachanun");
   if (tenDaysToday && wday !== 6 && wday !== 7 && !isErevYomKippurToday) minchaElements.push("Avinu Malkeinu");
 
+  // At the conclusion of an actual Yom Tov, Ma'ariv returns to the weekday
+  // Amidah.  Atah Chonantanu is included in that first item.  This also
+  // applies when the following day is Chol HaMoed.
+  const yomTovConcludesTonight = yomTovToday && !yomTovTomorrow && !shabbatTonight;
+  if (yomTovConcludesTonight) maarivElements.push("Weekday Amidah (with Atah Chonantanu)");
   if (maarivSeason) maarivElements.push(maarivSeason);
   if (!shabbatTonight && !yomTovTomorrow) maarivElements.push(rainDew);
   if (yomTovTomorrow) maarivElements.push("Festival Amidah");
-  if (hasYaalehMaariv && !yomTovTomorrow) maarivElements.push("Yaaleh Veyavo");
+  if (hasYaalehMaariv && !yomTovTomorrow) maarivElements.push("Ya'aleh Veyavo");
   if (hasAlHanissimMaariv) maarivElements.push("Al HaNissim");
   maarivElements.push(...extraMaar.filter(x => x !== "Festival Amidah"));
   // In the Ashkenaz rite, Avinu Malkeinu is also recited at Yom Kippur Ma'ariv.
   if (isYomKippurTonight && !shabbatTonight) maarivElements.push("Avinu Malkeinu");
   if (isLeDavidMaariv) maarivElements.push("Le'David");
+
+  // Chol HaMoed uses the weekday Amidah, not Festival Amidah.  Ya'aleh
+  // Veyavo is placed immediately after V'ten Berachah / V'ten Tal U'Matar.
+  const normalizeCholHaMoedService = (elements, active) => {
+    if (!active) return;
+    for (let i = elements.length - 1; i >= 0; i--) {
+      if (/^Festival Amidah(?: \+ Shabbat)?$/i.test(String(elements[i])) ||
+          /^Ya(?:'|’)aleh Veyavo$/i.test(String(elements[i]))) {
+        elements.splice(i, 1);
+      }
+    }
+    const vtenIndex = elements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
+    if (vtenIndex >= 0) elements.splice(vtenIndex + 1, 0, "Ya'aleh Veyavo");
+    else elements.push("Ya'aleh Veyavo");
+  };
+  normalizeCholHaMoedService(shachElements, cholHaMoedToday);
+  normalizeCholHaMoedService(minchaElements, cholHaMoedToday);
+  normalizeCholHaMoedService(maarivElements, cholHaMoedTomorrow);
 
   // Final Ten Days ordering. On weekday Amidah services, Ha'Melech Ha'Kadosh
   // is placed immediately before the seasonal insertion: before Morid HaTal
@@ -945,6 +978,15 @@ async function calculateDashboard() {
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
   if (isYomKippurToday) {
     for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
+      for (let i = serviceElements.length - 1; i >= 0; i--) {
+        if (/^Omit: Tachanun$/i.test(String(serviceElements[i]))) serviceElements.splice(i, 1);
+      }
+    }
+  }
+
+  // Tachanun omission notices are unnecessary on Shabbat and actual Yom Tov.
+  if (shabbatToday || yomTovToday) {
+    for (const serviceElements of [shachElements, minchaElements]) {
       for (let i = serviceElements.length - 1; i >= 0; i--) {
         if (/^Omit: Tachanun$/i.test(String(serviceElements[i]))) serviceElements.splice(i, 1);
       }
