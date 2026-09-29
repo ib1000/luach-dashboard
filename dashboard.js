@@ -317,6 +317,12 @@ async function calculateDashboard() {
 
   const isCholHaMoedTitle = (title) => /Chol HaMoed/i.test(String(title || "")) || /\(CH[’‘'"]{0,2}M\)/i.test(String(title || ""));
 
+  const isExcludedObservanceTitle = (title) => {
+    const t = String(title || "").trim();
+    return /^(?:Sigd|Yom HaAliyah School Observance|Yitzhak Rabin Memorial Day|Ben-Gurion Day|Aliyah Day|Mimouna|Herzl Day|Jabotinsky Day)(?:\s|$)/i.test(t);
+  };
+
+
   // A service uses the weekday Amidah rain/dew blessing only on a weekday.
   // Keep Chol HaMoed as weekday for this purpose; suppress the blessing only
   // on Shabbat or an actual Yom Tov.
@@ -438,8 +444,8 @@ async function calculateDashboard() {
       holidaysToday.push(title);
       isHoliday = true;
     } else if (category === "holiday" || category === "roshchodesh") {
-      // Sigd is intentionally omitted from the TODAY Holiday display.
-      if (!/^Sigd(?:\s|$)/i.test(title)) {
+      // Selected civic/commemorative observances are intentionally omitted from TODAY.
+      if (!isExcludedObservanceTitle(title)) {
         holidaysToday.push(title);
         isHoliday = true;
       }
@@ -1092,7 +1098,7 @@ async function calculateDashboard() {
         && String(item.date || "").slice(0,10) > today
         && !/Mevarchim|Molad/i.test(title)
         && !/^Erev\b/i.test(title)
-        && !/^Sigd(?:\s|$)/i.test(title);
+        && !isExcludedObservanceTitle(title);
     })
     .map(item => {
       const iso = String(item.date || "").slice(0,10);
