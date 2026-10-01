@@ -203,6 +203,10 @@ function hebrewDateForGregorianDay(items, day) {
   return "";
 }
 
+function isCholHaMoedTitle(title) {
+  return /Chol HaMoed/i.test(String(title || "")) || /\(CH[’‘'"]{0,2}M\)/i.test(String(title || ""));
+}
+
 function usesShortenedKabbalatShabbat(title, category = "") {
   // Only true Yom Tov / Chol HaMoed events should shorten Kabbalat Shabbat.
   // Avoid substring false-positives such as "Rosh Hashana LaBehemot".
@@ -314,8 +318,6 @@ async function calculateDashboard() {
     .filter(item => item?.category === "parashat" && String(item?.date || "").slice(0, 10) >= today)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
   if (nextParshaItem?.title) parshahDisplay = String(nextParshaItem.title).replace(/^Parashat\s+/i, "");
-
-  const isCholHaMoedTitle = (title) => /Chol HaMoed/i.test(String(title || "")) || /\(CH[’‘'"]{0,2}M\)/i.test(String(title || ""));
 
   const isExcludedObservanceTitle = (title) => {
     const t = String(title || "").trim();
