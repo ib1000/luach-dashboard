@@ -345,6 +345,15 @@ async function calculateDashboard() {
     String(item?.date || "").slice(0, 10) === tomorrow &&
     isCholHaMoedTitle(String(item?.title || ""))
   );
+  const isHoshanaRabaTitle = (title) => /Hoshana Rabb?a/i.test(String(title || ""));
+  const hoshanaRabaToday = items.some(item =>
+    String(item?.date || "").slice(0, 10) === today &&
+    isHoshanaRabaTitle(item?.title)
+  );
+  const hoshanaRabaTomorrow = items.some(item =>
+    String(item?.date || "").slice(0, 10) === tomorrow &&
+    isHoshanaRabaTitle(item?.title)
+  );
   const shabbatToday = wday === 7;
   const shabbatTonight = wday === 6; // Friday-night Ma'ariv belongs to Shabbat.
 
@@ -424,7 +433,7 @@ async function calculateDashboard() {
         (category === "roshchodesh" || category === "holiday") &&
         /^Rosh Chodesh(?:\s|$)/i.test(title);
       const isTomorrowActualYomTov = isActualYomTov(item, tomorrow);
-      if (isTomorrowRoshChodesh || isTomorrowActualYomTov || isCholHaMoedTitle(title)) {
+      if (isTomorrowRoshChodesh || isTomorrowActualYomTov || isCholHaMoedTitle(title) || isHoshanaRabaTitle(title)) {
         hasYaalehMaariv = true;
       } else if (/^(?:Chanukah|Purim)(?:\s|$)/i.test(title)) {
         hasAlHanissimMaariv = true;
@@ -515,7 +524,7 @@ async function calculateDashboard() {
         musafDisplay = "Yom Kippur";
       } else if (!/^Erev\b/i.test(title) && /Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)) {
         tachanunToday = false; tachanunMincha = false; tachanunReason = "Yom Tov / Chol HaMoed";
-        if (isCholHaMoedTitle(title)) {
+        if (isCholHaMoedTitle(title) || isHoshanaRabaTitle(title)) {
           hasYaalehShach = true; hasYaalehMincha = true;
         } else {
           otherShach.push("Festival Amidah");
@@ -818,9 +827,25 @@ async function calculateDashboard() {
     if (vtenIndex >= 0) elements.splice(vtenIndex + 1, 0, "Ya'aleh Veyavo");
     else elements.push("Ya'aleh Veyavo");
   };
-  normalizeCholHaMoedService(shachElements, cholHaMoedToday);
-  normalizeCholHaMoedService(minchaElements, cholHaMoedToday);
-  normalizeCholHaMoedService(maarivElements, cholHaMoedTomorrow);
+  normalizeCholHaMoedService(shachElements, cholHaMoedToday || hoshanaRabaToday);
+  normalizeCholHaMoedService(minchaElements, cholHaMoedToday || hoshanaRabaToday);
+  normalizeCholHaMoedService(maarivElements, cholHaMoedTomorrow || hoshanaRabaTomorrow);
+
+  // Ma'ariv at the end of Hoshana Raba begins Shemini Atzeret.
+  // Force the Festival Amidah even if the next-day holiday title was not
+  // recognized by the generic Yom Tov look-ahead.  The Shabbat suffix is
+  // applied later by markFestivalAmidahForShabbat().
+  if (hoshanaRabaToday) {
+    for (let i = maarivElements.length - 1; i >= 0; i--) {
+      if (/^Weekday Amidah(?: \(with Atah Chonantanu\))?$/i.test(String(maarivElements[i])) ||
+          /^Ya(?:'|’)aleh Veyavo$/i.test(String(maarivElements[i]))) {
+        maarivElements.splice(i, 1);
+      }
+    }
+    if (!maarivElements.some(x => /^Festival Amidah(?: \+ Shabbat)?$/i.test(String(x)))) {
+      maarivElements.unshift("Festival Amidah");
+    }
+  }
 
   // Final Ten Days ordering. On weekday Amidah services, Ha'Melech Ha'Kadosh
   // is placed immediately before the seasonal insertion: before Morid HaTal
@@ -998,6 +1023,17 @@ async function calculateDashboard() {
     if (specialFestivalTorahIndex >= 0) {
       shachElements.splice(specialFestivalTorahIndex + 1, 0, "Omit: La'menazeiach");
     }
+  }
+
+  // Hoshana Raba Shacharit begins with the extended Pesukei De'zimrah sequence.
+  // It otherwise follows the Chol HaMoed weekday-Amidah pattern.
+  if (hoshanaRabaToday) {
+    for (let i = shachElements.length - 1; i >= 0; i--) {
+      if (/^(?:Extended Pesukei De'zimrah|Omit: Nishmat)$/i.test(String(shachElements[i]))) {
+        shachElements.splice(i, 1);
+      }
+    }
+    shachElements.unshift("Extended Pesukei De'zimrah", "Omit: Nishmat");
   }
 
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
