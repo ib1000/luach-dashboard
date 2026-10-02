@@ -1036,6 +1036,100 @@ async function calculateDashboard() {
     shachElements.unshift("Extended Pesukei De'zimrah", "Omit: Nishmat");
   }
 
+
+  // Explicit Shemini Atzeret / Simchat Torah and seasonal Mashiv Ha'Ruach rules.
+  const isSheminiAtzeretToday = /Tishrei/i.test(hMonth) && hDay === 22;
+  const isSimchatTorahToday = /Tishrei/i.test(hMonth) && hDay === (isIsraelLocation ? 22 : 23);
+  const isPesachFirstDayToday = /Nisan/i.test(hMonth) && hDay === 15;
+
+  // On Shemini Atzeret and Simchat Torah, Shacharit and Mincha use the Festival Amidah.
+  // Shabbat wording is applied later by markFestivalAmidahForShabbat().
+  if (isSheminiAtzeretToday || isSimchatTorahToday) {
+    const festivalLabel = shabbatToday ? "Festival Amidah + Shabbat" : "Festival Amidah";
+    const ensureFestivalAmidah = (elements) => {
+      for (let i = elements.length - 1; i >= 0; i--) {
+        if (/^Festival Amidah(?: \+ Shabbat)?$/i.test(String(elements[i]))) elements.splice(i, 1);
+      }
+      elements.unshift(festivalLabel);
+    };
+    ensureFestivalAmidah(shachElements);
+    ensureFestivalAmidah(minchaElements);
+    const fullHallelIndex = shachElements.findIndex(x => /^Full Hallel$/i.test(String(x)));
+    if (fullHallelIndex >= 0) {
+      shachElements.splice(fullHallelIndex, 1);
+      shachElements.splice(1, 0, "Full Hallel");
+    }
+    musafDisplay = shabbatToday ? "Festival + Shabbat" : "Festival";
+  }
+
+  // Mashiv Ha'Ruach begins at Mincha on Shemini Atzeret and continues through
+  // Shacharit on the first day of Pesach. Morid Ha'Tal is suppressed throughout.
+  const isWinterMiddleMonth = (month) => /^(?:Cheshvan|Kislev|Tevet|Shevat|Adar(?: I| II)?)$/i.test(String(month || ""));
+  const useMashivShacharit =
+    (/Tishrei/i.test(hMonth) && hDay >= 23) ||
+    isWinterMiddleMonth(hMonth) ||
+    (/Nisan/i.test(hMonth) && hDay <= 15);
+  const useMashivMincha =
+    (/Tishrei/i.test(hMonth) && hDay >= 22) ||
+    isWinterMiddleMonth(hMonth) ||
+    (/Nisan/i.test(hMonth) && hDay < 15);
+  const useMashivMusaf = useMashivMincha;
+  const useMashivMaariv =
+    (/Tishrei/i.test(String(tomorrowHebrew.month || "")) && Number(tomorrowHebrew.day || 0) >= 23) ||
+    isWinterMiddleMonth(tomorrowHebrew.month) ||
+    (/Nisan/i.test(String(tomorrowHebrew.month || "")) && Number(tomorrowHebrew.day || 0) <= 15);
+
+  const replaceSeasonalMention = (elements, addMashiv) => {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const text = String(elements[i]);
+      if (/Mashiv HaRuach U'Morid HaGeshem|Mashiv Ha'?Ruach/i.test(text) || (addMashiv && /Morid Ha'?Tal/i.test(text))) {
+        elements.splice(i, 1);
+      }
+    }
+    if (addMashiv) {
+      const blessingIndex = elements.findIndex(x => /V'ten (?:Berachah|Tal U'Matar)/i.test(String(x)));
+      if (blessingIndex >= 0) elements.splice(blessingIndex, 0, "Mashiv Ha'Ruach");
+      else elements.push("Mashiv Ha'Ruach");
+    }
+  };
+  replaceSeasonalMention(shachElements, useMashivShacharit);
+  replaceSeasonalMention(minchaElements, useMashivMincha);
+  replaceSeasonalMention(maarivElements, useMashivMaariv);
+
+  // If Va'Todiainu is present in Ma'ariv, place it immediately after Mashiv Ha'Ruach.
+  {
+    let vaTodiainu = null;
+    for (let i = maarivElements.length - 1; i >= 0; i--) {
+      if (/^Va'?Todiainu$/i.test(String(maarivElements[i]))) {
+        vaTodiainu = maarivElements[i];
+        maarivElements.splice(i, 1);
+      }
+    }
+    if (vaTodiainu) {
+      const mashivIndex = maarivElements.findIndex(x => /^Mashiv Ha'Ruach$/i.test(String(x)));
+      if (mashivIndex >= 0) maarivElements.splice(mashivIndex + 1, 0, vaTodiainu);
+      else maarivElements.push(vaTodiainu);
+    }
+  }
+
+  // Yizkor is always the final Shacharit item on these days.
+  const isLastPesachDay = /Nisan/i.test(hMonth) && hDay === (isIsraelLocation ? 21 : 22);
+  const isYizkorShavuotDay = /Sivan/i.test(hMonth) && hDay === (isIsraelLocation ? 6 : 7);
+  const isYizkorDay = isYomKippurToday || isSheminiAtzeretToday || isLastPesachDay || isYizkorShavuotDay;
+  if (isYizkorDay) {
+    for (let i = shachElements.length - 1; i >= 0; i--) {
+      if (/^Yizkor$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
+    }
+    shachElements.push("Yizkor");
+  }
+  // On Shabbat Mincha, Torah: 3 Aliyot is always the first item.
+  if (shabbatToday) {
+    for (let i = minchaElements.length - 1; i >= 0; i--) {
+      if (/^Torah:\s*3 Aliyot$/i.test(String(minchaElements[i]))) minchaElements.splice(i, 1);
+    }
+    minchaElements.unshift("Torah: 3 Aliyot");
+  }
+
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
   if (isYomKippurToday) {
     for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
@@ -1168,12 +1262,26 @@ async function calculateDashboard() {
     ? `Shabbat Mevarchim (${mevarchimTitle || "Blessing of the New Month"}) occurs ${wday === 6 ? "tomorrow" : "today"}`
     : "";
 
+  // Build Musaf after all holiday/seasonal overrides. On Shemini Atzeret,
+  // Tefillat Geshem is the second item and is followed by Mashiv Ha'Ruach.
+  let musafElements = musafDisplay ? [musafDisplay, musafSeason, ...musafTenDays, hoshanotMusaf].filter(Boolean) : [];
+  for (let i = musafElements.length - 1; i >= 0; i--) {
+    if (/Morid Ha'?Tal|Mashiv HaRuach U'Morid HaGeshem|Mashiv Ha'?Ruach|Tefillat Geshem/i.test(String(musafElements[i]))) {
+      musafElements.splice(i, 1);
+    }
+  }
+  if (isSheminiAtzeretToday && musafDisplay) {
+    musafElements.splice(1, 0, "Tefillat Geshem", "Mashiv Ha'Ruach");
+  } else if (useMashivMusaf && musafDisplay) {
+    musafElements.splice(1, 0, "Mashiv Ha'Ruach");
+  }
+
   return {
     status:"ok",
     updated:{date:today,time:`${String(p.hour).padStart(2,"0")}:${String(p.minute).padStart(2,"0")}`,timezone:CONFIG.timezone,epoch:Date.now()},
     location:{name:CONFIG.name,latitude:CONFIG.latitude,longitude:CONFIG.longitude,timezone:CONFIG.timezone,countryCode:CONFIG.countryCode},
     calendar:{hebrew_date:hebrewDate,hebrew_date_current:hebrewDate,hebrew_date_next:tomorrowHebrewDate,parshah:parshahDisplay,is_holiday:isHoliday,holidays:holidaysToday,tachanun:tachanunDisplay,daf_yomi:dafYomi,shabbat_mevarchim:isMevarchim,mevarchim_title:mevarchimTitle,mevarchim_note:mevarchimNote,molad:moladInfo},
-    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafDisplay ? [musafDisplay,musafSeason,...musafTenDays,hoshanotMusaf].filter(Boolean) : [],mincha:minchaElements,neilah:neilahElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
+    tefillah:{nusach:"Ashkenaz",shacharit:shachElements,musaf:musafElements,mincha:minchaElements,neilah:neilahElements,kabbalat_shabbat:kabbalatShabbat,maariv:maarivElements},
     candle_lighting:candleLighting,
     zmanim:{ordered:zmanim,by_key:Object.fromEntries(zmanim.map(z=>[z.key,z.time]))},
     upcoming_events:upcomingEvents,
