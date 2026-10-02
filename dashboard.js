@@ -1112,6 +1112,22 @@ async function calculateDashboard() {
     }
   }
 
+  // On Shemini Atzeret and Simchat Torah, Full Hallel must be immediately
+  // after Festival Amidah (or Festival Amidah + Shabbat). Enforce this at the
+  // end of the service-normalization stage so later seasonal rules cannot
+  // separate the two items.
+  if (isSheminiAtzeretToday || isSimchatTorahToday) {
+    for (let i = shachElements.length - 1; i >= 0; i--) {
+      if (/^Full Hallel$/i.test(String(shachElements[i]))) {
+        shachElements.splice(i, 1);
+      }
+    }
+    const festivalIndex = shachElements.findIndex(x =>
+      /^Festival Amidah(?: \+ Shabbat)?$/i.test(String(x))
+    );
+    if (festivalIndex >= 0) shachElements.splice(festivalIndex + 1, 0, "Full Hallel");
+  }
+
   // Yizkor is always the final Shacharit item on these days.
   const isLastPesachDay = /Nisan/i.test(hMonth) && hDay === (isIsraelLocation ? 21 : 22);
   const isYizkorShavuotDay = /Sivan/i.test(hMonth) && hDay === (isIsraelLocation ? 6 : 7);
