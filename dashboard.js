@@ -1152,6 +1152,46 @@ async function calculateDashboard() {
     minchaElements.unshift("Torah: 3 Aliyot");
   }
 
+  // Shabbat Mincha: keep the seasonal mention directly after the Torah reading.
+  // Reposition an existing mention; do not create one when it is not applicable.
+  if (shabbatToday) {
+    let seasonal = null;
+    for (let i = minchaElements.length - 1; i >= 0; i--) {
+      if (/^(?:Mashiv Ha'?Ruach|Morid Ha'?Tal)$/i.test(String(minchaElements[i]))) {
+        seasonal = minchaElements[i];
+        minchaElements.splice(i, 1);
+      }
+    }
+    if (seasonal !== null) {
+      const torahIndex = minchaElements.findIndex(x => /^Torah:\s*3 Aliyot$/i.test(String(x)));
+      if (torahIndex >= 0) minchaElements.splice(torahIndex + 1, 0, seasonal);
+    }
+  }
+
+  // Final Saturday Ma'ariv ordering: the weekday Amidah with Havdalah leads.
+  if (shabbatToday) {
+    const label = "Weekday Amidah (with Atah Chonantanu)";
+    if (maarivElements.some(x => String(x) === label)) {
+      for (let i = maarivElements.length - 1; i >= 0; i--) {
+        if (String(maarivElements[i]) === label) maarivElements.splice(i, 1);
+      }
+      maarivElements.unshift(label);
+    }
+  }
+
+  // Shabbat Mincha omits La'menazeiach. Keep the notice after the other
+  // Mincha entries, but before the closing Barchi Nafshi / Pirkei Avot item.
+  if (shabbatToday) {
+    for (let i = minchaElements.length - 1; i >= 0; i--) {
+      if (/^Omit: La'menazeiach$/i.test(String(minchaElements[i]))) minchaElements.splice(i, 1);
+    }
+    const closingIndex = minchaElements.findIndex(x =>
+      /^(?:Barchi Nafshi|Pirkei Avot(?:\b|:))/i.test(String(x))
+    );
+    minchaElements.splice(closingIndex >= 0 ? closingIndex : minchaElements.length,
+      0, "Omit: La'menazeiach");
+  }
+
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
   if (isYomKippurToday) {
     for (const serviceElements of [shachElements, minchaElements, maarivElements]) {
