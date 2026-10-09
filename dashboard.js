@@ -395,22 +395,28 @@ async function calculateDashboard() {
 
     if (category === "molad" || /Molad/i.test(title)) {
       if (itemDay === today || (wday === 6 && itemDay === tomorrow)) {
-        let h = 0, m = 0, s = 0;
-        let day = "";
-        const isoMatch = itemDate.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
-        if (isoMatch) {
-          h = Number(isoMatch[4]); m = Number(isoMatch[5]); s = Number(isoMatch[6]);
-          day = dayName(`${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`);
+        // Hebcal molad dates are expressed in Jerusalem civil clock time.
+        // Prefer the explicitly supplied molad wording when available, since
+        // it retains the original chalakim (seconds are not exact chalakim).
+        const raw = [item.memo, item.title, item.hebrew].filter(Boolean).join(" ");
+        const clock = raw.match(/(?:^|\s)(Sun(?:day)?|Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?)[,\s]+(\d{1,2}):(\d{2})\s*(am|pm)?\s*(?:and\s*)?(\d{1,3})?\s*chalakim/i);
+        const iso = itemDate.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+        let day, h, m, chalakim;
+        if (clock) {
+          day = clock[1]; h = Number(clock[2]); m = Number(clock[3]);
+          if (clock[4]) h = h % 12 + (/pm/i.test(clock[4]) ? 12 : 0);
+          chalakim = clock[5] ? Number(clock[5]) : 0;
+        } else if (iso) {
+          // Preserve the Jerusalem wall-clock values supplied by Hebcal.
+          // Do not convert to the viewer's time zone.
+          day = dayName(iso[1]); h = Number(iso[2]); m = Number(iso[3]);
+          chalakim = Math.round(Number(iso[4] || 0) * 3 / 10);
         } else {
-          const tm = title.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-          if (tm) { h = Number(tm[1]); m = Number(tm[2]); s = Number(tm[3] || 0); }
+          day = dayName(itemDay); h = 0; m = 0; chalakim = 0;
         }
-        day ||= dayName(today);
-        const chalakim = Math.floor((s * 0.3) + 0.5);
-        let monthName = "";
         const mm = title.match(/Molad\s+([A-Za-z\s']+)/i);
-        if (mm) monthName = mm[1].replace(/\s*\d+.*$/, "").trim();
-        moladInfo = `Molad ${monthName || "New Month"}: ${day}, ${h} hours, ${m} minutes, and ${chalakim} chalakim`;
+        const monthName = mm ? mm[1].replace(/\s*\d+.*$/, "").trim() : "New Month";
+        moladInfo = `Molad ${monthName}: ${day}, ${h} hours, ${m} minutes, and ${chalakim} chalakim`;
       }
     }
 
