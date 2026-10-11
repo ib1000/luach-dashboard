@@ -1039,6 +1039,15 @@ async function calculateDashboard() {
     }
   }
 
+  // Weekday Rosh Chodesh: the omission notice follows the four aliyot.
+  if (!shabbatToday && musafDisplay === "Rosh Chodesh") {
+    for (let i = shachElements.length - 1; i >= 0; i--) {
+      if (/^Omit: La'menazeiach$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
+    }
+    const fourAliyot = shachElements.findIndex(x => /^Torah: 4 Aliyot$/i.test(String(x)));
+    if (fourAliyot >= 0) shachElements.splice(fourAliyot + 1, 0, "Omit: La'menazeiach");
+  }
+
   // Hoshana Raba Shacharit begins with the extended Pesukei De'zimrah sequence.
   // It otherwise follows the Chol HaMoed weekday-Amidah pattern.
   if (hoshanaRabaToday) {
@@ -1354,6 +1363,28 @@ async function calculateDashboard() {
     musafElements.splice(1, 0, "Tefillat Geshem", "Mashiv Ha'Ruach");
   } else if (useMashivMusaf && musafDisplay) {
     musafElements.splice(1, 0, "Mashiv Ha'Ruach");
+  }
+
+  // On Rosh Chodesh in a Hebrew leap year, add the specified Musaf
+  // phrase in Cheshvan through Adar II, including Shabbat Rosh Chodesh.
+  // Derive the year from the Gregorian date rather than a possibly
+  // localized/formatted Hebcal hdate string.
+  const hebrewYearParts = new Intl.DateTimeFormat("en-u-ca-hebrew", {
+    year: "numeric", timeZone: "UTC"
+  }).formatToParts(new Date(`${today}T12:00:00Z`));
+  const hebrewYear = Number(hebrewYearParts.find(part => part.type === "year")?.value || 0);
+  const leapYear = hebrewYear > 0 && [0, 3, 6, 8, 11, 14, 17].includes(hebrewYear % 19);
+  // On day I of a two-day Rosh Chodesh the Hebrew date is still day 30
+  // of the *previous* month (e.g. 30 Tishrei = Rosh Chodesh Cheshvan).
+  // Use the incoming month, not the outgoing month, for this Musaf rule.
+  const roshChodeshMonth = hDay === 30
+    ? new Intl.DateTimeFormat("en-u-ca-hebrew", {month: "long", timeZone: "UTC"})
+        .format(new Date(`${tomorrow}T12:00:00Z`))
+    : hMonth;
+  const winterRoshChodesh = /^(?:Cheshvan|Heshvan|Kislev|Tevet|Shvat|Shevat|Adar\s+I|Adar\s+II)$/i.test(roshChodeshMonth);
+  if (/^Rosh Chodesh(?: \+ Shabbat)?$/.test(musafDisplay) && leapYear && winterRoshChodesh) {
+    const mashivIndex = musafElements.findIndex(x => /^Mashiv Ha'Ruach$/i.test(String(x)));
+    if (mashivIndex >= 0) musafElements.splice(mashivIndex + 1, 0, "U'le'chaparat Pasha");
   }
 
   return {
