@@ -795,9 +795,17 @@ async function calculateDashboard() {
   }
 
   if (wday === 7) {
-    const tzidkatechahOmitted = yomTovToday || holidaysToday.some(title =>
-      /Rosh Chodesh|Chanukah|Purim|Rosh Hashana|Yom Kippur|Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)
-    );
+    // Tzidkatechah is omitted not only on Shabbat coinciding with a
+    // special day, but also when the following day is Rosh Chodesh or
+    // Yom Tov.  For example, Shabbat 29 Tishrei 5787 precedes Rosh
+    // Chodesh Cheshvan, so it must show the omission notice.
+    const tomorrowIsRoshChodesh = Number(tomorrowHebrew.day) === 30 ||
+      items.some(item => String(item.date || "").slice(0, 10) === tomorrow &&
+        /^Rosh Chodesh(?:\s|$)/i.test(String(item.title || "")));
+    const tzidkatechahOmitted = yomTovToday || yomTovTomorrow ||
+      tomorrowIsRoshChodesh || holidaysToday.some(title =>
+        /Rosh Chodesh|Chanukah|Purim|Rosh Hashana|Yom Kippur|Pesach|Shavuot|Sukkot|Shemini Atzeret|Simchat Torah/i.test(title)
+      );
     if (tzidkatechahOmitted) minchaElements.push("Omit: Tzidkatechah");
   }
 
@@ -1179,17 +1187,27 @@ async function calculateDashboard() {
     }
   }
 
-  // Shabbat Mincha omits La'menazeiach. Keep the notice after the other
-  // Mincha entries, but before the closing Barchi Nafshi / Pirkei Avot item.
+  // Shabbat Mincha: never show the La'menazeiach omission notice.
+  // If Tzidkatechah is omitted, put its notice after all other Mincha
+  // items, immediately before Barchi Nafshi or Pirkei Avot if present.
   if (shabbatToday) {
+    let omitTzidkatechah = null;
     for (let i = minchaElements.length - 1; i >= 0; i--) {
-      if (/^Omit: La'menazeiach$/i.test(String(minchaElements[i]))) minchaElements.splice(i, 1);
+      const label = String(minchaElements[i]);
+      if (/^Omit: La'menazeiach$/i.test(label)) {
+        minchaElements.splice(i, 1);
+      } else if (/^Omit: Tzidkatechah$/i.test(label)) {
+        omitTzidkatechah = minchaElements[i];
+        minchaElements.splice(i, 1);
+      }
     }
-    const closingIndex = minchaElements.findIndex(x =>
-      /^(?:Barchi Nafshi|Pirkei Avot(?:\b|:))/i.test(String(x))
-    );
-    minchaElements.splice(closingIndex >= 0 ? closingIndex : minchaElements.length,
-      0, "Omit: La'menazeiach");
+    if (omitTzidkatechah !== null) {
+      const closingIndex = minchaElements.findIndex(x =>
+        /^(?:Barchi Nafshi|Pirkei Avot(?:\b|:))/i.test(String(x))
+      );
+      minchaElements.splice(closingIndex >= 0 ? closingIndex : minchaElements.length,
+        0, omitTzidkatechah);
+    }
   }
 
   // On Yom Kippur itself, Tachanun omission notices are not displayed in any service.
