@@ -321,7 +321,7 @@ async function calculateDashboard() {
 
   const isExcludedObservanceTitle = (title) => {
     const t = String(title || "").trim();
-    return /^(?:Sigd|Yom HaAliyah School Observance|Yitzhak Rabin Memorial Day|Ben-Gurion Day|Aliyah Day|Mimouna|Herzl Day|Jabotinsky Day)(?:\s|$)/i.test(t);
+    return /^(?:Sigd|Yom HaAliyah School Observance|Yitzhak Rabin Memorial Day|Ben-Gurion Day|Aliyah Day|Mimouna|Herzl Day|Jabotinsky Day|Chag HaBanot)(?:\s|$)/i.test(t);
   };
 
 
