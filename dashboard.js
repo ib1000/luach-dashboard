@@ -248,7 +248,7 @@ function renderTimeFormatDependentFields() {
     }
   }
   if (nextRefreshTarget) {
-    $("next-refresh").textContent = `Next Hebcal API refresh: ${formatTime(nextRefreshTarget, {seconds:true})}`;
+    $("next-refresh").textContent = `Next Hebcal API refresh: ${formatTime(nextRefreshTarget)}`;
   }
 }
 
@@ -1326,22 +1326,28 @@ async function calculateDashboard() {
       return { title:String(item.title || ""), category:item.category, date:iso, text_date:humanDate(iso, {weekday:"short"}) };
     });
 
-  // When Rosh Chodesh spans two consecutive days, make the two days explicit
-  // as Rosh Chodesh I <month> and Rosh Chodesh II <month>.
-  for (let i = 0; i < upcomingEventCandidates.length; i++) {
-    const current = upcomingEventCandidates[i];
-    if (!/^Rosh Chodesh\s+/i.test(current.title)) continue;
-    const month = current.title.replace(/^Rosh Chodesh\s+/i, "").trim();
-    const next = upcomingEventCandidates[i + 1];
-    if (!next || next.category !== current.category) continue;
-    const nextMonth = String(next.title || "").replace(/^Rosh Chodesh\s+/i, "").trim();
-    const d1 = new Date(`${current.date}T00:00:00Z`);
-    const d2 = new Date(`${next.date}T00:00:00Z`);
-    const consecutive = (d2 - d1) === 86400000;
-    if (consecutive && /^Rosh Chodesh\s+/i.test(next.title) && nextMonth === month) {
-      current.title = `Rosh Chodesh I ${month}`;
-      next.title = `Rosh Chodesh II ${month}`;
-      i++;
+  // Label both days of a two-day Rosh Chodesh even when another event
+  // (such as Chanukah on Tevet) appears between them in the event feed.
+  // Single-day Rosh Chodesh retains its ordinary name.
+  const roshChodeshByMonth = new Map();
+  for (const event of upcomingEventCandidates) {
+    const match = /^Rosh Chodesh\s+(?:(?:I|II|1|2)\s+)?(.+)$/i.exec(event.title);
+    if (!match) continue;
+    const month = match[1].trim();
+    const key = month.toLowerCase();
+    if (!roshChodeshByMonth.has(key)) roshChodeshByMonth.set(key, []);
+    roshChodeshByMonth.get(key).push({ event, month });
+  }
+  for (const entries of roshChodeshByMonth.values()) {
+    entries.sort((a, b) => a.event.date.localeCompare(b.event.date));
+    for (let i = 0; i + 1 < entries.length; i++) {
+      const first = entries[i], second = entries[i + 1];
+      const daysApart = (Date.parse(`${second.event.date}T00:00:00Z`) - Date.parse(`${first.event.date}T00:00:00Z`)) / 86400000;
+      if (daysApart === 1) {
+        first.event.title = `Rosh Chodesh I ${first.month}`;
+        second.event.title = `Rosh Chodesh II ${second.month}`;
+        i++;
+      }
     }
   }
 
@@ -1593,7 +1599,7 @@ function scheduleNextRefresh(data) {
   const delay=Math.max(5000, target.getTime()-Date.now()+CONFIG.refreshCushionMs);
   refreshTimer=setTimeout(refreshDashboard, delay);
   nextRefreshTarget = target;
-  $("next-refresh").textContent=`Next Hebcal API refresh: ${formatTime(target, {seconds:true})}`;
+  $("next-refresh").textContent=`Next Hebcal API refresh: ${formatTime(target)}`;
 }
 
 
