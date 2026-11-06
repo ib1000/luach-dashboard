@@ -416,7 +416,9 @@ async function calculateDashboard() {
         }
         const mm = title.match(/Molad\s+([A-Za-z\s']+)/i);
         const monthName = mm ? mm[1].replace(/\s*\d+.*$/, "").trim() : "New Month";
-        moladInfo = `Molad ${monthName}: ${day}, ${h} hours, ${m} minutes, and ${chalakim} chalakim`;
+        const clockHour = h % 12 || 12;
+        const ampm = h >= 12 ? "pm" : "am";
+        moladInfo = `Molad ${monthName}: ${day}, ${clockHour}:${String(m).padStart(2, "0")}${ampm}, 0 seconds and ${chalakim} chalakim`;
       }
     }
 
@@ -683,7 +685,7 @@ async function calculateDashboard() {
   const diaspBlessing = isDiaspRain ? "V'ten Tal U'Matar Livrachah" : "V'ten Berachah";
   const rainDew = diaspBlessing === israelBlessing
     ? diaspBlessing
-    : `Diaspora: ${diaspBlessing} | Israel: ${israelBlessing}`;
+    : `Diaspora: ${diaspBlessing} / Israel: ${israelBlessing}`;
 
   if (shachSeason) shachElements.push(shachSeason);
   if (!shabbatToday && !yomTovToday) shachElements.push(rainDew);
