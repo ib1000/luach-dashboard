@@ -683,9 +683,12 @@ async function calculateDashboard() {
 
   const israelBlessing = isIsraelRain ? "V'ten Tal U'Matar Livrachah" : "V'ten Berachah";
   const diaspBlessing = isDiaspRain ? "V'ten Tal U'Matar Livrachah" : "V'ten Berachah";
+  const displayBlessing = (blessing) => blessing.replace("Livrachah", "Li'vrachah");
   const rainDew = diaspBlessing === israelBlessing
-    ? diaspBlessing
-    : `Diaspora: ${diaspBlessing} / Israel: ${israelBlessing}`;
+    ? displayBlessing(isIsraelLocation ? israelBlessing : diaspBlessing)
+    : isIsraelLocation
+      ? `${displayBlessing(israelBlessing)} (Diaspora: ${displayBlessing(diaspBlessing)})`
+      : `${displayBlessing(diaspBlessing)} (Israel: ${displayBlessing(israelBlessing)})`;
 
   if (shachSeason) shachElements.push(shachSeason);
   if (!shabbatToday && !yomTovToday) shachElements.push(rainDew);
