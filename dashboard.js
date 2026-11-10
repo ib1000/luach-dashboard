@@ -314,6 +314,39 @@ async function calculateDashboard() {
   const hallelShach = [], torahShach = [], otherShach = [], extraMincha = [], extraMaar = [];
 
   const items = calData.items || [];
+  // Label Rosh Chodesh using the full calendar feed, including TODAY.
+  // A two-day Rosh Chodesh is 30 of the previous Hebrew month followed
+  // by 1 of the new month; never infer its length from future-only events.
+  const roshChodeshLabels = new Map();
+  const roshChodeshGroups = new Map();
+  for (const item of calData.items || []) {
+    if (!/^(?:holiday|roshchodesh)$/i.test(String(item.category || ""))) continue;
+    const match = /^Rosh Chodesh\s+(?:(?:I|II|1|2)\s+)?(.+)$/i.exec(String(item.title || "").trim());
+    if (!match) continue;
+    const date = String(item.date || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const month = match[1].trim();
+    const key = month.toLowerCase();
+    if (!roshChodeshGroups.has(key)) roshChodeshGroups.set(key, []);
+    roshChodeshGroups.get(key).push({ date, month });
+  }
+  for (const group of roshChodeshGroups.values()) {
+    group.sort((a, b) => a.date.localeCompare(b.date));
+    for (let i = 0; i + 1 < group.length; i++) {
+      const a = group[i], b = group[i + 1];
+      if (addDays(a.date, 1) === b.date) {
+        roshChodeshLabels.set(`${a.date}|${a.month.toLowerCase()}`, `Rosh Chodesh I ${a.month}`);
+        roshChodeshLabels.set(`${b.date}|${b.month.toLowerCase()}`, `Rosh Chodesh II ${b.month}`);
+        i++;
+      }
+    }
+  }
+  const labelRoshChodesh = (title, date) => {
+    const match = /^Rosh Chodesh\s+(?:(?:I|II|1|2)\s+)?(.+)$/i.exec(String(title || "").trim());
+    if (!match) return title;
+    return roshChodeshLabels.get(`${date}|${match[1].trim().toLowerCase()}`) || title;
+  };
+
   const nextParshaItem = items
     .filter(item => item?.category === "parashat" && String(item?.date || "").slice(0, 10) >= today)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
@@ -465,7 +498,7 @@ async function calculateDashboard() {
     } else if (category === "holiday" || category === "roshchodesh") {
       // Selected civic/commemorative observances are intentionally omitted from TODAY.
       if (!isExcludedObservanceTitle(title)) {
-        holidaysToday.push(title);
+        holidaysToday.push(labelRoshChodesh(title, itemDay));
         isHoliday = true;
       }
 
@@ -938,7 +971,7 @@ async function calculateDashboard() {
   // 2) Omit Mizmor Le'Todah follows Selichot.
   // 3) Al Cheit is not displayed in Shacharit.
   // 4) Omit: Tachanun immediately follows V'ten Berachah / V'ten Tal U'Matar.
-  // 5) Omit La'menazeiach immediately precedes Le'David.
+  // 5) Omit La'menatsayach immediately precedes Le'David.
   if (isErevYomKippurToday) {
     const removeMatching = (re) => {
       for (let i = shachElements.length - 1; i >= 0; i--) {
@@ -949,7 +982,7 @@ async function calculateDashboard() {
     removeMatching(/^Selichot$/i);
     removeMatching(/^Omit: Mizmor Le'Todah$/i);
     removeMatching(/^Omit: Tachanun$/i);
-    removeMatching(/^Omit: La'menazeiach$/i);
+    removeMatching(/^Omit: La'menatsayach$/i);
     removeMatching(/^Al Cheit$/i);
 
     shachElements.unshift("Selichot", "Omit: Mizmor Le'Todah");
@@ -959,8 +992,8 @@ async function calculateDashboard() {
     else shachElements.push("Omit: Tachanun");
 
     const leDavidIndex = shachElements.findIndex(x => /^Le'David$/i.test(String(x)));
-    if (leDavidIndex >= 0) shachElements.splice(leDavidIndex, 0, "Omit: La'menazeiach");
-    else shachElements.push("Omit: La'menazeiach");
+    if (leDavidIndex >= 0) shachElements.splice(leDavidIndex, 0, "Omit: La'menatsayach");
+    else shachElements.push("Omit: La'menatsayach");
   }
 
   // Erev Yom Kippur Mincha ordering (9 Tishrei): Al Cheit belongs
@@ -1030,27 +1063,27 @@ async function calculateDashboard() {
     markFestivalAmidahForShabbat(maarivElements);
   }
 
-  // On weekday Chol HaMoed Shacharit, Omit: La'menazeiach follows
+  // On weekday Chol HaMoed Shacharit, Omit: La'menatsayach follows
   // Torah: Special Festival Reading immediately.
   if (cholHaMoedToday && !shabbatToday) {
     for (let i = shachElements.length - 1; i >= 0; i--) {
-      if (/^Omit: La'menazeiach$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
+      if (/^Omit: La'menatsayach$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
     }
     const specialFestivalTorahIndex = shachElements.findIndex(x =>
       /^Torah: Special Festival Reading$/i.test(String(x))
     );
     if (specialFestivalTorahIndex >= 0) {
-      shachElements.splice(specialFestivalTorahIndex + 1, 0, "Omit: La'menazeiach");
+      shachElements.splice(specialFestivalTorahIndex + 1, 0, "Omit: La'menatsayach");
     }
   }
 
   // Weekday Rosh Chodesh: the omission notice follows the four aliyot.
   if (!shabbatToday && musafDisplay === "Rosh Chodesh") {
     for (let i = shachElements.length - 1; i >= 0; i--) {
-      if (/^Omit: La'menazeiach$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
+      if (/^Omit: La'menatsayach$/i.test(String(shachElements[i]))) shachElements.splice(i, 1);
     }
     const fourAliyot = shachElements.findIndex(x => /^Torah: 4 Aliyot$/i.test(String(x)));
-    if (fourAliyot >= 0) shachElements.splice(fourAliyot + 1, 0, "Omit: La'menazeiach");
+    if (fourAliyot >= 0) shachElements.splice(fourAliyot + 1, 0, "Omit: La'menatsayach");
   }
 
   // Hoshana Raba Shacharit begins with the extended Pesukei De'zimrah sequence.
@@ -1201,14 +1234,14 @@ async function calculateDashboard() {
     }
   }
 
-  // Shabbat Mincha: never show the La'menazeiach omission notice.
+  // Shabbat Mincha: never show the La'menatsayach omission notice.
   // If Tzidkatechah is omitted, put its notice after all other Mincha
   // items, immediately before Barchi Nafshi or Pirkei Avot if present.
   if (shabbatToday) {
     let omitTzidkatechah = null;
     for (let i = minchaElements.length - 1; i >= 0; i--) {
       const label = String(minchaElements[i]);
-      if (/^Omit: La'menazeiach$/i.test(label)) {
+      if (/^Omit: La'menatsayach$/i.test(label)) {
         minchaElements.splice(i, 1);
       } else if (/^Omit: Tzidkatechah$/i.test(label)) {
         omitTzidkatechah = minchaElements[i];
@@ -1331,29 +1364,8 @@ async function calculateDashboard() {
       return { title:String(item.title || ""), category:item.category, date:iso, text_date:humanDate(iso, {weekday:"short"}) };
     });
 
-  // Label both days of a two-day Rosh Chodesh even when another event
-  // (such as Chanukah on Tevet) appears between them in the event feed.
-  // Single-day Rosh Chodesh retains its ordinary name.
-  const roshChodeshByMonth = new Map();
   for (const event of upcomingEventCandidates) {
-    const match = /^Rosh Chodesh\s+(?:(?:I|II|1|2)\s+)?(.+)$/i.exec(event.title);
-    if (!match) continue;
-    const month = match[1].trim();
-    const key = month.toLowerCase();
-    if (!roshChodeshByMonth.has(key)) roshChodeshByMonth.set(key, []);
-    roshChodeshByMonth.get(key).push({ event, month });
-  }
-  for (const entries of roshChodeshByMonth.values()) {
-    entries.sort((a, b) => a.event.date.localeCompare(b.event.date));
-    for (let i = 0; i + 1 < entries.length; i++) {
-      const first = entries[i], second = entries[i + 1];
-      const daysApart = (Date.parse(`${second.event.date}T00:00:00Z`) - Date.parse(`${first.event.date}T00:00:00Z`)) / 86400000;
-      if (daysApart === 1) {
-        first.event.title = `Rosh Chodesh I ${first.month}`;
-        second.event.title = `Rosh Chodesh II ${second.month}`;
-        i++;
-      }
-    }
+    event.title = labelRoshChodesh(event.title, event.date);
   }
 
   const upcomingEvents = upcomingEventCandidates.slice(0, 10);
