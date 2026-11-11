@@ -344,7 +344,25 @@ async function calculateDashboard() {
   const labelRoshChodesh = (title, date) => {
     const match = /^Rosh Chodesh\s+(?:(?:I|II|1|2)\s+)?(.+)$/i.exec(String(title || "").trim());
     if (!match) return title;
-    return roshChodeshLabels.get(`${date}|${match[1].trim().toLowerCase()}`) || title;
+    const month = match[1].trim();
+    // Determine the day from the Hebrew calendar rather than relying on
+    // Hebcal returning both Rosh Chodesh event records in the feed.
+    // The 30th of the preceding month is day I; the following 1st is day II.
+    // On a one-day Rosh Chodesh, the 1st is not preceded by a 30th.
+    const hebrewDay = iso => {
+      const parts = new Intl.DateTimeFormat("en-u-ca-hebrew", {
+        day: "numeric", month: "long", year: "numeric", timeZone: "UTC"
+      }).formatToParts(new Date(`${iso}T12:00:00Z`));
+      return Number(parts.find(part => part.type === "day")?.value || 0);
+    };
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const day = hebrewDay(date);
+      if (day === 30 && hebrewDay(addDays(date, 1)) === 1)
+        return `Rosh Chodesh I ${month}`;
+      if (day === 1 && hebrewDay(addDays(date, -1)) === 30)
+        return `Rosh Chodesh II ${month}`;
+    }
+    return roshChodeshLabels.get(`${date}|${month.toLowerCase()}`) || title;
   };
 
   const nextParshaItem = items
@@ -1426,7 +1444,7 @@ function renderFacts(calendar) {
   const rows = [
     ["Parshah", calendar.parshah],
     ["Daf Yomi", calendar.daf_yomi],
-    ["Holiday", calendar.is_holiday ? (calendar.holidays?.join(", ") || "Yes") : "No"],
+    ["Holiday", calendar.is_holiday ? (calendar.holidays?.join(", ") || "Yes") : "-"],
   ];
   const dl = $("today-facts"); dl.replaceChildren();
   for (const [k,v] of rows) {
